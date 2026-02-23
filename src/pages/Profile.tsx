@@ -131,6 +131,16 @@ export default function Profile() {
             </Button>
             <Button variant="outline" className="w-full" onClick={async () => {
               try {
+                if (!("Notification" in window)) {
+                  toast({ title: "⚠️ API Notification não disponível", description: "No app nativo, as push notifications usam FCM diretamente. Testando token FCM...", });
+                  const token = await requestFCMToken();
+                  if (token) {
+                    toast({ title: "✅ Token FCM obtido!", description: token.substring(0, 30) + "..." });
+                  } else {
+                    toast({ title: "❌ Token não obtido", variant: "destructive" });
+                  }
+                  return;
+                }
                 const perm = Notification.permission;
                 toast({ title: `Permissão atual: ${perm}` });
                 if (perm === "default") {
