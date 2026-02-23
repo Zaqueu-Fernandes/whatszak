@@ -10,6 +10,11 @@ const config: CapacitorConfig = {
       backgroundColor: '#25D366',
       showSpinner: false,
     },
+    StatusBar: {
+      overlaysWebView: false,
+      style: 'DARK',
+      backgroundColor: '#25D366',
+    },
   },
   android: {
     allowMixedContent: true,
