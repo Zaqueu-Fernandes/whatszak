@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { useState, useCallback } from "react";
 import type { CallMode } from "@/hooks/use-webrtc";
@@ -146,6 +146,8 @@ function AppContent() {
   );
 }
 
+const Router = isNativePlatform() ? HashRouter : BrowserRouter;
+
 const App = () => (
   <ErrorBoundary>
     <QueryClientProvider client={queryClient}>
@@ -153,9 +155,9 @@ const App = () => (
         <Toaster />
         <Sonner />
         <AuthProvider>
-          <BrowserRouter>
+          <Router>
             <AppContent />
-          </BrowserRouter>
+          </Router>
         </AuthProvider>
       </TooltipProvider>
     </QueryClientProvider>
