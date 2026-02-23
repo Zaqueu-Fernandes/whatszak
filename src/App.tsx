@@ -4,15 +4,17 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
-import { useState, useRef, useCallback } from "react";
+import { useState, useCallback } from "react";
 import type { CallMode } from "@/hooks/use-webrtc";
 import SplashScreen from "@/components/SplashScreen";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import InstallPrompt from "@/components/InstallPrompt";
 import IncomingCallDialog from "@/components/call/IncomingCallDialog";
 import ActiveCallOverlay from "@/components/call/ActiveCallOverlay";
 import { useIncomingCalls } from "@/hooks/use-incoming-calls";
 import { useWebRTC } from "@/hooks/use-webrtc";
 import { usePushNotifications } from "@/hooks/use-push-notifications";
+import { isNativePlatform } from "@/lib/capacitor-push";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import ForgotPassword from "./pages/ForgotPassword";
@@ -118,12 +120,15 @@ function IncomingCallHandler() {
 
 function AppContent() {
   const [showSplash, setShowSplash] = useState(true);
+  const isNative = isNativePlatform();
 
   return (
     <>
       {showSplash && <SplashScreen onFinish={() => setShowSplash(false)} />}
-      <InstallPrompt />
-      <IncomingCallHandler />
+      {!isNative && <InstallPrompt />}
+      <ErrorBoundary silent>
+        <IncomingCallHandler />
+      </ErrorBoundary>
       <Routes>
         <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
         <Route path="/signup" element={<PublicRoute><Signup /></PublicRoute>} />
@@ -142,17 +147,19 @@ function AppContent() {
 }
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <AuthProvider>
-        <BrowserRouter basename={import.meta.env.BASE_URL}>
-          <AppContent />
-        </BrowserRouter>
-      </AuthProvider>
-    </TooltipProvider>
-  </QueryClientProvider>
+  <ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <AuthProvider>
+          <BrowserRouter>
+            <AppContent />
+          </BrowserRouter>
+        </AuthProvider>
+      </TooltipProvider>
+    </QueryClientProvider>
+  </ErrorBoundary>
 );
 
 export default App;
