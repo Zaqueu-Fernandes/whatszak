@@ -33,8 +33,10 @@ export async function requestFCMToken(): Promise<string | null> {
     const m = getMessagingInstance();
     if (!m) return null;
 
-    const permission = await Notification.requestPermission();
-    if (permission !== "granted") return null;
+    if ("Notification" in window) {
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") return null;
+    }
 
     // Register or get existing Firebase messaging SW (respect base URL)
     const base = import.meta.env.BASE_URL || "/";
