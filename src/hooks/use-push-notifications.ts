@@ -1,7 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { requestFCMToken, onForegroundMessage } from "@/lib/firebase";
 import { isNativePlatform, registerNativePush, setupNativePushListeners } from "@/lib/capacitor-push";
 import { useNotificationSound } from "@/hooks/use-notifications";
 import { toast } from "sonner";
@@ -25,20 +24,20 @@ export function usePushNotifications(userId: string | undefined) {
         } else {
           console.warn("[Push] Native token not obtained");
         }
+      }).catch((err) => {
+        console.error("[Push] Native registration error:", err);
       });
 
       // Set up native push listeners
       const cleanup = setupNativePushListeners(
-        // Foreground notification
-        (title, body, data) => {
-          playSound();
+        (title, body, _data) => {
+          try { playSound(); } catch (_e) { /* ignore */ }
           toast(title, { description: body });
         },
-        // Notification tap (background/closed)
         (data) => {
           const chatId = data?.chat_id;
-          if (chatId && navigate) {
-            navigate(`/chat/${chatId}`);
+          if (chatId) {
+            try { navigate(`/chat/${chatId}`); } catch (_e) { /* ignore */ }
           }
         }
       );
@@ -50,6 +49,7 @@ export function usePushNotifications(userId: string | undefined) {
       
       const register = async () => {
         try {
+          const { requestFCMToken } = await import("@/lib/firebase");
           const token = await requestFCMToken();
           if (!token) {
             console.warn("FCM token not available");
@@ -79,40 +79,47 @@ export function usePushNotifications(userId: string | undefined) {
     }
   }, [userId]);
 
-  // Handle foreground messages (web only - native handled by setupNativePushListeners)
+  // Handle foreground messages (web only)
   useEffect(() => {
-    if (isNativePlatform()) return; // Native handles this differently
+    if (isNativePlatform()) return;
 
-    const unsub = onForegroundMessage((payload: any) => {
-      const title = payload.data?.title || payload.notification?.title;
-      const body = payload.data?.body || payload.notification?.body;
-      if (!title) return;
+    let unsubscribe = () => {};
+    
+    import("@/lib/firebase").then(({ onForegroundMessage }) => {
+      unsubscribe = onForegroundMessage((payload: any) => {
+        const title = payload.data?.title || payload.notification?.title;
+        const body = payload.data?.body || payload.notification?.body;
+        if (!title) return;
 
-      if (document.hidden) {
-        playSound();
-        if ("Notification" in window && Notification.permission === "granted") {
-          const chatId = payload.data?.chat_id;
-          const notification = new Notification(title, {
-            body: body || "",
-            icon: "/pwa-192x192.png",
-            badge: "/pwa-192x192.png",
-            tag: "whatzak-push",
-            renotify: true,
-            data: payload.data || {},
-          } as NotificationOptions);
-          notification.onclick = () => {
-            window.focus();
-            if (chatId) {
-              window.location.href = `/chat/${chatId}`;
-            }
-            notification.close();
-          };
+        if (document.hidden) {
+          try { playSound(); } catch (_e) { /* ignore */ }
+          if ("Notification" in window && Notification.permission === "granted") {
+            const chatId = payload.data?.chat_id;
+            const notification = new Notification(title, {
+              body: body || "",
+              icon: "/pwa-192x192.png",
+              badge: "/pwa-192x192.png",
+              tag: "whatzak-push",
+              renotify: true,
+              data: payload.data || {},
+            } as NotificationOptions);
+            notification.onclick = () => {
+              window.focus();
+              if (chatId) {
+                window.location.href = `/chat/${chatId}`;
+              }
+              notification.close();
+            };
+          }
+        } else {
+          try { playSound(); } catch (_e) { /* ignore */ }
+          toast(title, { description: body });
         }
-      } else {
-        playSound();
-        toast(title, { description: body });
-      }
+      });
+    }).catch((err) => {
+      console.error("[Push] Failed to load firebase module:", err);
     });
-    return unsub;
+
+    return () => unsubscribe();
   }, [playSound]);
 }
