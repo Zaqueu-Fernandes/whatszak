@@ -146,22 +146,43 @@ function AppContent() {
   );
 }
 
-const Router = isNativePlatform() ? HashRouter : BrowserRouter;
+const webBasename = (() => {
+  if (import.meta.env.BASE_URL !== "/") {
+    return import.meta.env.BASE_URL.replace(/\/$/, "");
+  }
 
-const App = () => (
-  <ErrorBoundary>
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <AuthProvider>
-          <Router>
-            <AppContent />
-          </Router>
-        </AuthProvider>
-      </TooltipProvider>
-    </QueryClientProvider>
-  </ErrorBoundary>
-);
+  const pathname = window.location.pathname;
+  if (pathname === "/family-connect" || pathname.startsWith("/family-connect/")) {
+    return "/family-connect";
+  }
+
+  return undefined;
+})();
+
+const App = () => {
+  const isNative = isNativePlatform();
+
+  return (
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <AuthProvider>
+            {isNative ? (
+              <HashRouter>
+                <AppContent />
+              </HashRouter>
+            ) : (
+              <BrowserRouter basename={webBasename}>
+                <AppContent />
+              </BrowserRouter>
+            )}
+          </AuthProvider>
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
+  );
+};
 
 export default App;
