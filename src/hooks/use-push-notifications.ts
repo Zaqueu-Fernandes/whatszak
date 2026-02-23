@@ -9,16 +9,7 @@ import { toast } from "sonner";
 export function usePushNotifications(userId: string | undefined) {
   const registeredRef = useRef(false);
   const playSound = useNotificationSound();
-  const navigateRef = useRef<ReturnType<typeof useNavigate> | null>(null);
-
-  // We need navigate but this hook might be used outside Router context
-  // So we try to get it safely
-  try {
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    navigateRef.current = useNavigate();
-  } catch {
-    // Not inside Router - that's ok
-  }
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (!userId || registeredRef.current) return;
@@ -46,8 +37,8 @@ export function usePushNotifications(userId: string | undefined) {
         // Notification tap (background/closed)
         (data) => {
           const chatId = data?.chat_id;
-          if (chatId && navigateRef.current) {
-            navigateRef.current(`/chat/${chatId}`);
+          if (chatId && navigate) {
+            navigate(`/chat/${chatId}`);
           }
         }
       );
