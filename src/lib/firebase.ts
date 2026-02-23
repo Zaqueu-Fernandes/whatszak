@@ -1,5 +1,4 @@
-import { initializeApp } from "firebase/app";
-import { getMessaging, getToken, onMessage, type Messaging } from "firebase/messaging";
+import { Capacitor } from "@capacitor/core";
 
 const firebaseConfig = {
   apiKey: "AIzaSyC6OnsbYZXkLJml9BAspouq_BuQcbZsYjk",
@@ -13,14 +12,21 @@ const firebaseConfig = {
 
 const VAPID_KEY = "BNbyVrS0vnO5_K6aHn3jgEkSzVu8dvNW0PMSLu9VB6FwLpbJLmAbYilmlToF0DU4c2OkMEQbTjcY36HLExY5F_I";
 
-const app = initializeApp(firebaseConfig);
+let firebaseApp: any = null;
+let messaging: any = null;
 
-let messaging: Messaging | null = null;
-
-function getMessagingInstance(): Messaging | null {
+async function getMessagingInstance(): Promise<any> {
+  // Firebase Messaging (web) is not supported on native platforms
+  if (Capacitor.isNativePlatform()) return null;
+  
   if (messaging) return messaging;
   try {
-    messaging = getMessaging(app);
+    const { initializeApp } = await import("firebase/app");
+    const { getMessaging } = await import("firebase/messaging");
+    if (!firebaseApp) {
+      firebaseApp = initializeApp(firebaseConfig);
+    }
+    messaging = getMessaging(firebaseApp);
     return messaging;
   } catch {
     console.warn("Firebase Messaging not supported in this browser");
@@ -30,7 +36,9 @@ function getMessagingInstance(): Messaging | null {
 
 export async function requestFCMToken(): Promise<string | null> {
   try {
-    const m = getMessagingInstance();
+    if (Capacitor.isNativePlatform()) return null;
+    
+    const m = await getMessagingInstance();
     if (!m) return null;
 
     if ("Notification" in window) {
@@ -61,6 +69,7 @@ export async function requestFCMToken(): Promise<string | null> {
     }
 
     console.log("[FCM] SW active, requesting token...");
+    const { getToken } = await import("firebase/messaging");
     const token = await getToken(m, {
       vapidKey: VAPID_KEY,
       serviceWorkerRegistration: registration,
@@ -74,7 +83,15 @@ export async function requestFCMToken(): Promise<string | null> {
 }
 
 export function onForegroundMessage(callback: (payload: any) => void) {
-  const m = getMessagingInstance();
-  if (!m) return () => {};
-  return onMessage(m, callback);
+  if (Capacitor.isNativePlatform()) return () => {};
+  
+  // Use dynamic import to avoid loading firebase/messaging on native
+  let unsubscribe = () => {};
+  getMessagingInstance().then((m) => {
+    if (!m) return;
+    import("firebase/messaging").then(({ onMessage }) => {
+      unsubscribe = onMessage(m, callback);
+    });
+  });
+  return () => unsubscribe();
 }
