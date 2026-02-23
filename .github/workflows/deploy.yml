@@ -29,6 +29,7 @@ jobs:
 
       - name: Build
         env:
+          GITHUB_PAGES: "true"
           VITE_SUPABASE_URL: "https://mvarmtaypdbwolgakndm.supabase.co"
           VITE_SUPABASE_PUBLISHABLE_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im12YXJtdGF5cGRid29sZ2FrbmRtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyNzM3NDQsImV4cCI6MjA4Njg0OTc0NH0.ROEnjLFXXiiUoPHLOK9a71a45VM201BHePG_-lZqFQw"
           VITE_SUPABASE_PROJECT_ID: "mvarmtaypdbwolgakndm"
