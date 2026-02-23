@@ -12,8 +12,6 @@ dist
 dist-ssr
 *.local
 .env
-LogoApp.png
-LogoApp-removebg.png
 Comandos Git pós atualização APK.docx
 
 # Editor directories and files
