@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Camera, ArrowLeft, LogOut, Bell, BellRing } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { requestFCMToken } from "@/lib/firebase";
+import { isNativePlatform, registerNativePush } from "@/lib/capacitor-push";
 import { sendPushToUser } from "@/lib/push";
 
 export default function Profile() {
@@ -131,8 +132,18 @@ export default function Profile() {
             </Button>
             <Button variant="outline" className="w-full" onClick={async () => {
               try {
+                if (isNativePlatform()) {
+                  toast({ title: "📱 Plataforma nativa detectada" });
+                  const token = await registerNativePush(user!.id);
+                  if (token) {
+                    toast({ title: "✅ Token nativo obtido!", description: token.substring(0, 30) + "..." });
+                  } else {
+                    toast({ title: "❌ Token não obtido", description: "Verifique permissão de notificações nas configurações do app", variant: "destructive" });
+                  }
+                  return;
+                }
                 if (!("Notification" in window)) {
-                  toast({ title: "⚠️ API Notification não disponível", description: "No app nativo, as push notifications usam FCM diretamente. Testando token FCM...", });
+                  toast({ title: "⚠️ API Notification não disponível", description: "Testando token FCM...", });
                   const token = await requestFCMToken();
                   if (token) {
                     toast({ title: "✅ Token FCM obtido!", description: token.substring(0, 30) + "..." });

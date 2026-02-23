@@ -151,7 +151,21 @@ Deno.serve(async (req) => {
             title,
             body,
           },
+          // Android native notification (Capacitor app)
+          android: {
+            priority: "high" as const,
+            notification: {
+              title,
+              body,
+              icon: "ic_launcher",
+              channel_id: "default",
+              sound: "default",
+              click_action: "FCM_PLUGIN_ACTIVITY",
+            },
+          },
+          // Web push notification (PWA / browser)
           webpush: {
+            headers: { Urgency: "high" },
             notification: {
               title,
               body,
@@ -159,6 +173,7 @@ Deno.serve(async (req) => {
               badge: "/pwa-192x192.png",
               tag: "whatzak-push",
               renotify: "true",
+              requireInteraction: "true",
             },
             fcm_options: { link: "/" },
           },
