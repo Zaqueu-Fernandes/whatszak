@@ -17,28 +17,14 @@
     <meta property="og:title" content="WhatsZak" />
     <meta property="og:description" content="Pate papo Famila" />
     <meta property="og:type" content="website" />
-    <meta property="og:image" content="https://zaqueu-fernandes.github.io/family-connect/og-image.png" />
+    <meta property="og:image" content="https://whatszak.vercel.app/og-image.png" />
 
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@WhatsZak" />
-    <meta name="twitter:image" content="https://zaqueu-fernandes.github.io/family-connect/og-image.png" />
+    <meta name="twitter:image" content="https://whatszak.vercel.app/og-image.png" />
   </head>
 
   <body>
-    <!-- GitHub Pages SPA redirect handler -->
-    <script>
-      (function(l) {
-        if (l.search[1] === '/') {
-          var decoded = l.search.slice(1).split('&').map(function(s) {
-            return s.replace(/~and~/g, '&')
-          }).join('?');
-          window.history.replaceState(null, null,
-            l.pathname.slice(0, -1) + decoded + l.hash
-          );
-        }
-      }(window.location))
-    </script>
-
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

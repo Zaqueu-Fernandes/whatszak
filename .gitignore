@@ -12,6 +12,8 @@ dist
 dist-ssr
 *.local
 .env
+supabase/.temp
+.claude/
 Comandos Git pós atualização APK.docx
 
 # Editor directories and files

@@ -1,7 +1,6 @@
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
-import { componentTagger } from "lovable-tagger";
 import { VitePWA } from "vite-plugin-pwa";
 
 // https://vitejs.dev/config/
@@ -9,12 +8,12 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   
   // Fallback values in case .env is missing
-  const supabaseUrl = env.VITE_SUPABASE_URL || "https://mvarmtaypdbwolgakndm.supabase.co";
-  const supabaseKey = env.VITE_SUPABASE_PUBLISHABLE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im12YXJtdGF5cGRid29sZ2FrbmRtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyNzM3NDQsImV4cCI6MjA4Njg0OTc0NH0.ROEnjLFXXiiUoPHLOK9a71a45VM201BHePG_-lZqFQw";
-  const supabaseProjectId = env.VITE_SUPABASE_PROJECT_ID || "mvarmtaypdbwolgakndm";
+  const supabaseUrl = env.VITE_SUPABASE_URL || "https://tuddxnujcluwsuxifnfq.supabase.co";
+  const supabaseKey = env.VITE_SUPABASE_PUBLISHABLE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR1ZGR4bnVqY2x1d3N1eGlmbmZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyNzI3MDksImV4cCI6MjA4Njg0ODcwOX0.65tPR7C1ymuggQutDzap3Ck1yc0Zy_k0p6bUicJgOnU";
+  const supabaseProjectId = env.VITE_SUPABASE_PROJECT_ID || "tuddxnujcluwsuxifnfq";
 
   return {
-    base: process.env.GITHUB_PAGES === "true" ? "/family-connect/" : "/",
+    base: "/",
     server: {
       host: "::",
       port: 8080,
@@ -29,7 +28,6 @@ export default defineConfig(({ mode }) => {
     },
     plugins: [
       react(),
-      mode === "development" && componentTagger(),
       VitePWA({
         registerType: "autoUpdate",
         injectRegister: null,
