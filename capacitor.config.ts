@@ -19,6 +19,10 @@ const config: CapacitorConfig = {
   android: {
     allowMixedContent: true,
   },
+  server: {
+    url: 'https://whatszak.vercel.app',
+    cleartext: false,
+  },
 };
 
 export default config;
