@@ -1,0 +1,104 @@
+package app.lovable.familyconnect;
+
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
+import android.content.Context;
+import android.content.Intent;
+import android.os.Build;
+import androidx.core.app.NotificationCompat;
+import java.util.Map;
+
+public class IncomingCallNotifier {
+
+    public static final String CHANNEL_ID = "calls";
+    public static final int NOTIFICATION_ID = 7821;
+
+    public static final String EXTRA_CALL_ID = "call_id";
+    public static final String EXTRA_CHAT_ID = "chat_id";
+    public static final String EXTRA_CALLER_NAME = "caller_name";
+    public static final String EXTRA_CALL_TYPE = "call_type";
+
+    public static final String ACTION_DECLINE = "app.lovable.familyconnect.action.DECLINE_CALL";
+
+    public static void notifyIncomingCall(Context context, Map<String, String> data) {
+        String callId = data.get("call_id");
+        String chatId = data.get("chat_id");
+        String callerName = data.get("title") != null ? data.get("title") : "Chamada recebida";
+        String callType = data.containsKey("call_type") ? data.get("call_type") : "audio";
+
+        if (callId == null) return;
+
+        ensureChannel(context);
+
+        Intent fullScreenIntent = new Intent(context, IncomingCallActivity.class);
+        fullScreenIntent.putExtra(EXTRA_CALL_ID, callId);
+        fullScreenIntent.putExtra(EXTRA_CHAT_ID, chatId);
+        fullScreenIntent.putExtra(EXTRA_CALLER_NAME, callerName);
+        fullScreenIntent.putExtra(EXTRA_CALL_TYPE, callType);
+        fullScreenIntent.setFlags(
+            Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP
+        );
+
+        PendingIntent fullScreenPendingIntent = PendingIntent.getActivity(
+            context,
+            callId.hashCode(),
+            fullScreenIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+        );
+
+        Intent declineIntent = new Intent(context, CallActionReceiver.class);
+        declineIntent.setAction(ACTION_DECLINE);
+        declineIntent.putExtra(EXTRA_CALL_ID, callId);
+        PendingIntent declinePendingIntent = PendingIntent.getBroadcast(
+            context,
+            callId.hashCode(),
+            declineIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+        );
+
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(context.getApplicationInfo().icon)
+            .setContentTitle(callerName)
+            .setContentText(callType.equals("video") ? "Chamada de vídeo recebida" : "Chamada de áudio recebida")
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_CALL)
+            .setOngoing(true)
+            .setAutoCancel(false)
+            .setFullScreenIntent(fullScreenPendingIntent, true)
+            .setContentIntent(fullScreenPendingIntent)
+            .addAction(0, "Recusar", declinePendingIntent)
+            .addAction(0, "Atender", fullScreenPendingIntent);
+
+        NotificationManager manager = context.getSystemService(NotificationManager.class);
+        manager.notify(NOTIFICATION_ID, builder.build());
+
+        Intent ringIntent = new Intent(context, CallRingingService.class);
+        ringIntent.putExtra(EXTRA_CALL_ID, callId);
+        context.startForegroundService(ringIntent);
+    }
+
+    public static void dismiss(Context context) {
+        NotificationManager manager = context.getSystemService(NotificationManager.class);
+        manager.cancel(NOTIFICATION_ID);
+        context.stopService(new Intent(context, CallRingingService.class));
+    }
+
+    private static void ensureChannel(Context context) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;
+        NotificationManager manager = context.getSystemService(NotificationManager.class);
+        NotificationChannel existing = manager.getNotificationChannel(CHANNEL_ID);
+        if (existing != null) return;
+
+        NotificationChannel channel = new NotificationChannel(
+            CHANNEL_ID,
+            "Chamadas",
+            NotificationManager.IMPORTANCE_HIGH
+        );
+        channel.setDescription("Chamadas de áudio e vídeo recebidas");
+        channel.setSound(null, null); // ringtone is played by CallRingingService instead
+        channel.enableVibration(true);
+        channel.enableLights(true);
+        manager.createNotificationChannel(channel);
+    }
+}

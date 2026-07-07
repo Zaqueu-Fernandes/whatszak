@@ -4,7 +4,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
+import { App as CapacitorApp } from "@capacitor/app";
 import type { CallMode } from "@/hooks/use-webrtc";
 import SplashScreen from "@/components/SplashScreen";
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -92,6 +93,37 @@ function IncomingCallHandler() {
       dismissIncoming();
     }
   };
+
+  // Handles the native full-screen incoming-call UI's Accept/Decline actions,
+  // delivered as a "whatszak://call?..." deep link even when the app was killed.
+  useEffect(() => {
+    const listenerPromise = CapacitorApp.addListener("appUrlOpen", ({ url }) => {
+      let parsed: URL;
+      try {
+        parsed = new URL(url);
+      } catch {
+        return;
+      }
+      if (parsed.protocol !== "whatszak:" || parsed.host !== "call") return;
+
+      const action = parsed.searchParams.get("action");
+      const callId = parsed.searchParams.get("call_id");
+      const callType = (parsed.searchParams.get("call_type") as CallMode) || "audio";
+      if (!callId) return;
+
+      if (action === "answer") {
+        answerCall(callId, callType);
+        dismissIncoming();
+      } else if (action === "decline") {
+        rejectCall(callId);
+        dismissIncoming();
+      }
+    });
+
+    return () => {
+      listenerPromise.then((listener) => listener.remove());
+    };
+  }, [answerCall, rejectCall, dismissIncoming]);
 
   return (
     <>

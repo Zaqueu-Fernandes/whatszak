@@ -161,7 +161,7 @@ export function useWebRTC({ userId, onRemoteStream, onCallEnded }: UseWebRTCOpti
         calleeId,
         `📞 ${callerName}`,
         `Chamada de ${callType} recebida`,
-        { chat_id: chatId, call_id: currentCallId, type: "call" }
+        { chat_id: chatId, call_id: currentCallId, type: "call", call_type: mode }
       ).catch((err) => console.error("[PUSH] call push error:", err));
 
       const pc = createPeerConnection(currentCallId);

@@ -141,6 +141,8 @@ Deno.serve(async (req) => {
     const projectId = serviceAccount.project_id;
     const fcmUrl = `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`;
 
+    const isCall = pushData?.type === "call";
+
     const results = [];
     for (const { token } of tokens) {
       const message = {
@@ -151,18 +153,23 @@ Deno.serve(async (req) => {
             title,
             body,
           },
-          // Android native notification (Capacitor app)
-          android: {
-            priority: "high" as const,
-            notification: {
-              title,
-              body,
-              icon: "ic_launcher",
-              channel_id: "default",
-              sound: "default",
-              click_action: "FCM_PLUGIN_ACTIVITY",
-            },
-          },
+          // Android: calls are sent data-only so they always reach the app's
+          // FirebaseMessagingService (and its full-screen call UI) even when the
+          // process is killed. Regular messages keep the auto-displayed system
+          // notification, which also works while the app is killed.
+          android: isCall
+            ? { priority: "high" as const }
+            : {
+                priority: "high" as const,
+                notification: {
+                  title,
+                  body,
+                  icon: "ic_launcher",
+                  channel_id: "default",
+                  sound: "default",
+                  click_action: "FCM_PLUGIN_ACTIVITY",
+                },
+              },
           // Web push notification (PWA / browser)
           webpush: {
             headers: { Urgency: "high" },
