@@ -5,8 +5,6 @@ import { isNativePlatform, registerNativePush, setupNativePushListeners } from "
 import { useNotificationSound } from "@/hooks/use-notifications";
 import { toast } from "sonner";
 
-const enableNativePush = (import.meta as any).env?.VITE_ENABLE_NATIVE_PUSH === "true";
-
 export function usePushNotifications(userId: string | undefined) {
   const registeredRef = useRef(false);
   const playSound = useNotificationSound();
@@ -17,12 +15,6 @@ export function usePushNotifications(userId: string | undefined) {
     registeredRef.current = true;
 
     if (isNativePlatform()) {
-      // Evita crash em Android sem configuração completa do Firebase nativo
-      if (!enableNativePush) {
-        console.warn("[Push] Native push desativado por segurança. Defina VITE_ENABLE_NATIVE_PUSH=true após configurar firebase nativo.");
-        return;
-      }
-
       // ===== NATIVE (Android/iOS via Capacitor) =====
       console.log("[Push] Native platform detected, using Capacitor Push");
       

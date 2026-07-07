@@ -1,16 +1,15 @@
 import { Capacitor } from "@capacitor/core";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyC6OnsbYZXkLJml9BAspouq_BuQcbZsYjk",
-  authDomain: "whatszak.firebaseapp.com",
-  projectId: "whatszak",
-  storageBucket: "whatszak.firebasestorage.app",
-  messagingSenderId: "518347482386",
-  appId: "1:518347482386:web:570beff4e627cad9d03fcb",
-  measurementId: "G-E4B4YCXCTZ",
+  apiKey: "AIzaSyCKoERRZMNZ3JdwGqvrade0LzWLWpRSofw",
+  authDomain: "whatszak-c58a7.firebaseapp.com",
+  projectId: "whatszak-c58a7",
+  storageBucket: "whatszak-c58a7.firebasestorage.app",
+  messagingSenderId: "416618641889",
+  appId: "1:416618641889:web:aee7d3b2511ac3f9787aa0",
 };
 
-const VAPID_KEY = "BNbyVrS0vnO5_K6aHn3jgEkSzVu8dvNW0PMSLu9VB6FwLpbJLmAbYilmlToF0DU4c2OkMEQbTjcY36HLExY5F_I";
+const VAPID_KEY = "BCuwb5y06JvR8b515EvKrIzEz8RwR2NzfPNjBVZNYTNYLuJ3bQpUckFSd8WQ_KAo3b5EzWUcXzP0EWaP5u48gRw";
 
 let firebaseApp: any = null;
 let messaging: any = null;

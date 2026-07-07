@@ -3,12 +3,12 @@ importScripts("https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js
 importScripts("https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js");
 
 firebase.initializeApp({
-  apiKey: "AIzaSyC6OnsbYZXkLJml9BAspouq_BuQcbZsYjk",
-  authDomain: "whatszak.firebaseapp.com",
-  projectId: "whatszak",
-  storageBucket: "whatszak.firebasestorage.app",
-  messagingSenderId: "518347482386",
-  appId: "1:518347482386:web:570beff4e627cad9d03fcb",
+  apiKey: "AIzaSyCKoERRZMNZ3JdwGqvrade0LzWLWpRSofw",
+  authDomain: "whatszak-c58a7.firebaseapp.com",
+  projectId: "whatszak-c58a7",
+  storageBucket: "whatszak-c58a7.firebasestorage.app",
+  messagingSenderId: "416618641889",
+  appId: "1:416618641889:web:aee7d3b2511ac3f9787aa0",
 });
 
 const messaging = firebase.messaging();

@@ -28,6 +28,23 @@ export async function registerNativePush(userId: string): Promise<string | null>
       return null;
     }
 
+    // Create the "default" channel used by the send-push edge function.
+    // Without this, Android silently drops notifications while the app is
+    // backgrounded/killed, since the FCM payload targets channel_id "default".
+    try {
+      await PushNotifications.createChannel({
+        id: "default",
+        name: "Mensagens",
+        description: "Notificações de novas mensagens",
+        importance: 5,
+        visibility: 1,
+        vibration: true,
+        lights: true,
+      });
+    } catch (err) {
+      console.warn("[NativePush] createChannel failed (non-fatal):", err);
+    }
+
     // Register with the OS
     await PushNotifications.register();
 

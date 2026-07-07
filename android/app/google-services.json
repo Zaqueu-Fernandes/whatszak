@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "416618641889",
+    "project_id": "whatszak-c58a7",
+    "storage_bucket": "whatszak-c58a7.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:416618641889:android:aace15199c8a4236787aa0",
+        "android_client_info": {
+          "package_name": "app.lovable.familyconnect"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAIBOvAmhT5EZwP1qCpk6-N_p0nlN3vGhI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
