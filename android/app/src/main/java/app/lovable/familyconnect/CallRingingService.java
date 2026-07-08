@@ -30,7 +30,7 @@ public class CallRingingService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         Notification silentNotification = new NotificationCompat.Builder(this, IncomingCallNotifier.CHANNEL_ID)
-            .setSmallIcon(getApplicationInfo().icon)
+            .setSmallIcon(R.drawable.ic_call_notification)
             .setContentTitle("Chamada em andamento")
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build();

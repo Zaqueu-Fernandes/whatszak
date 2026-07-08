@@ -58,7 +58,7 @@ public class IncomingCallNotifier {
         );
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(context.getApplicationInfo().icon)
+            .setSmallIcon(R.drawable.ic_call_notification)
             .setContentTitle(callerName)
             .setContentText(callType.equals("video") ? "Chamada de vídeo recebida" : "Chamada de áudio recebida")
             .setPriority(NotificationCompat.PRIORITY_HIGH)

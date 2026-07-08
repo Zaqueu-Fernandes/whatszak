@@ -30,9 +30,15 @@ export function usePushNotifications(userId: string | undefined) {
 
       // Set up native push listeners
       const cleanup = setupNativePushListeners(
-        (title, body, _data) => {
+        (title, body, data) => {
           try { playSound(); } catch (_e) { /* ignore */ }
-          toast(title, { description: body });
+          const chatId = data?.chat_id;
+          toast(title, {
+            description: body,
+            action: chatId
+              ? { label: "Abrir", onClick: () => navigate(`/chat/${chatId}`) }
+              : undefined,
+          });
         },
         (data) => {
           const chatId = data?.chat_id;

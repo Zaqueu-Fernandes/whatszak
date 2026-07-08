@@ -167,7 +167,6 @@ Deno.serve(async (req) => {
                   icon: "ic_launcher",
                   channel_id: "default",
                   sound: "default",
-                  click_action: "FCM_PLUGIN_ACTIVITY",
                 },
               },
           // Web push notification (PWA / browser)
