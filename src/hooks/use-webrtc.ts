@@ -25,6 +25,7 @@ export function useWebRTC({ userId, onRemoteStream, onCallEnded }: UseWebRTCOpti
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const peerIdRef = useRef<string | null>(null);
 
   const cleanup = useCallback(() => {
     localStreamRef.current?.getTracks().forEach((t) => t.stop());
@@ -38,6 +39,7 @@ export function useWebRTC({ userId, onRemoteStream, onCallEnded }: UseWebRTCOpti
     setCallStatus("idle");
     setCallId(null);
     setCallMode("audio");
+    peerIdRef.current = null;
   }, []);
 
   const getLocalStream = async (mode: CallMode) => {
@@ -148,6 +150,7 @@ export function useWebRTC({ userId, onRemoteStream, onCallEnded }: UseWebRTCOpti
 
       const currentCallId = call.id;
       setCallId(currentCallId);
+      peerIdRef.current = calleeId;
 
       // Send push notification to callee for when app is minimized/closed
       const { data: callerProfile } = await supabase
@@ -200,6 +203,7 @@ export function useWebRTC({ userId, onRemoteStream, onCallEnded }: UseWebRTCOpti
         cleanup();
         return;
       }
+      peerIdRef.current = call.caller_id;
 
       const pc = createPeerConnection(incomingCallId);
       stream.getTracks().forEach((track) => pc.addTrack(track, stream));
@@ -239,11 +243,21 @@ export function useWebRTC({ userId, onRemoteStream, onCallEnded }: UseWebRTCOpti
 
   const endCall = async (overrideCallId?: string) => {
     const id = overrideCallId ?? callId;
+    const peerId = peerIdRef.current;
     if (id) {
       await supabase
         .from("calls")
         .update({ status: "ended", ended_at: new Date().toISOString() })
         .eq("id", id);
+
+      // Notify the other side natively even if their app is closed, so the
+      // native ringing/full-screen call UI doesn't keep going indefinitely.
+      if (peerId) {
+        sendPushToUser(peerId, "Chamada encerrada", "A chamada foi encerrada", {
+          call_id: id,
+          type: "call_ended",
+        }).catch((err) => console.error("[PUSH] call_ended push error:", err));
+      }
     }
     cleanup();
     onCallEnded();

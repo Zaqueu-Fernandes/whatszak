@@ -20,6 +20,7 @@ public class IncomingCallNotifier {
     public static final String EXTRA_CALL_TYPE = "call_type";
 
     public static final String ACTION_DECLINE = "app.lovable.familyconnect.action.DECLINE_CALL";
+    public static final String ACTION_CALL_ENDED = "app.lovable.familyconnect.action.CALL_ENDED";
 
     public static void notifyIncomingCall(Context context, Map<String, String> data) {
         String callId = data.get("call_id");
@@ -82,6 +83,19 @@ public class IncomingCallNotifier {
         NotificationManager manager = context.getSystemService(NotificationManager.class);
         manager.cancel(NOTIFICATION_ID);
         context.stopService(new Intent(context, CallRingingService.class));
+    }
+
+    // Called when the other party hangs up (via a "call_ended" push) so the
+    // ringing notification/service stop and any open full-screen call UI closes,
+    // even though this device never touched Recusar/Atender itself.
+    public static void endCall(Context context, String callId) {
+        dismiss(context);
+        Intent endIntent = new Intent(ACTION_CALL_ENDED);
+        endIntent.setPackage(context.getPackageName());
+        if (callId != null) {
+            endIntent.putExtra(EXTRA_CALL_ID, callId);
+        }
+        context.sendBroadcast(endIntent);
     }
 
     private static void ensureChannel(Context context) {

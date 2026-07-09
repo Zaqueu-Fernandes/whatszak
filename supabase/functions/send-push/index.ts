@@ -141,7 +141,7 @@ Deno.serve(async (req) => {
     const projectId = serviceAccount.project_id;
     const fcmUrl = `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`;
 
-    const isCall = pushData?.type === "call";
+    const isCall = pushData?.type === "call" || pushData?.type === "call_ended";
 
     const results = [];
     for (const { token } of tokens) {

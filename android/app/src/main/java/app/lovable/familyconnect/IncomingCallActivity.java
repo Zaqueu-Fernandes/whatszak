@@ -1,7 +1,10 @@
 package app.lovable.familyconnect;
 
 import android.app.KeyguardManager;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -14,6 +17,7 @@ public class IncomingCallActivity extends AppCompatActivity {
     private String callId;
     private String chatId;
     private String callType;
+    private BroadcastReceiver callEndedReceiver;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -38,6 +42,38 @@ public class IncomingCallActivity extends AppCompatActivity {
 
         acceptButton.setOnClickListener(v -> finishWithAction("answer"));
         declineButton.setOnClickListener(v -> finishWithAction("decline"));
+
+        registerCallEndedReceiver();
+    }
+
+    // If the caller hangs up before we act, a "call_ended" push triggers this
+    // broadcast natively (see IncomingCallNotifier.endCall) so this screen closes
+    // itself instead of ringing/staying open indefinitely.
+    private void registerCallEndedReceiver() {
+        callEndedReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                String endedCallId = intent.getStringExtra(IncomingCallNotifier.EXTRA_CALL_ID);
+                if (callId == null || callId.equals(endedCallId)) {
+                    finish();
+                }
+            }
+        };
+        IntentFilter filter = new IntentFilter(IncomingCallNotifier.ACTION_CALL_ENDED);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(callEndedReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            registerReceiver(callEndedReceiver, filter);
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (callEndedReceiver != null) {
+            unregisterReceiver(callEndedReceiver);
+            callEndedReceiver = null;
+        }
+        super.onDestroy();
     }
 
     private void showOverLockScreen() {

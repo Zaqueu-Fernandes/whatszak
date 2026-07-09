@@ -13,8 +13,11 @@ public class WhatszakMessagingService extends MessagingService {
         super.onMessageReceived(remoteMessage);
 
         Map<String, String> data = remoteMessage.getData();
-        if ("call".equals(data.get("type")) && !WhatszakApplication.isInForeground()) {
+        String type = data.get("type");
+        if ("call".equals(type) && !WhatszakApplication.isInForeground()) {
             IncomingCallNotifier.notifyIncomingCall(getApplicationContext(), data);
+        } else if ("call_ended".equals(type)) {
+            IncomingCallNotifier.endCall(getApplicationContext(), data.get("call_id"));
         }
     }
 }
