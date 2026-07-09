@@ -7,6 +7,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
 import androidx.core.app.NotificationCompat;
+import androidx.core.app.Person;
 import java.util.Map;
 
 public class IncomingCallNotifier {
@@ -58,6 +59,15 @@ public class IncomingCallNotifier {
             PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
         );
 
+        Person caller = new Person.Builder()
+            .setName(callerName)
+            .setImportant(true)
+            .build();
+
+        // Android 12+ (and several OEM skins even earlier) expect CallStyle for
+        // category=call notifications to render Answer/Decline at all — plain
+        // addAction() buttons on a CATEGORY_CALL notification can silently fail
+        // to show on the collapsed/expanded views on some launchers.
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_call_notification)
             .setContentTitle(callerName)
@@ -68,8 +78,7 @@ public class IncomingCallNotifier {
             .setAutoCancel(false)
             .setFullScreenIntent(fullScreenPendingIntent, true)
             .setContentIntent(fullScreenPendingIntent)
-            .addAction(0, "Recusar", declinePendingIntent)
-            .addAction(0, "Atender", fullScreenPendingIntent);
+            .setStyle(NotificationCompat.CallStyle.forIncomingCall(caller, declinePendingIntent, fullScreenPendingIntent));
 
         NotificationManager manager = context.getSystemService(NotificationManager.class);
         manager.notify(NOTIFICATION_ID, builder.build());
