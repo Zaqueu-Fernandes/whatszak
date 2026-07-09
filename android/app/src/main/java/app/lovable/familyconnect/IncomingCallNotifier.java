@@ -1,5 +1,6 @@
 package app.lovable.familyconnect;
 
+import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
@@ -31,6 +32,27 @@ public class IncomingCallNotifier {
 
         if (callId == null) return;
 
+        ensureChannel(context);
+
+        NotificationManager manager = context.getSystemService(NotificationManager.class);
+        manager.notify(NOTIFICATION_ID, buildCallNotification(context, callId, chatId, callerName, callType));
+
+        Intent ringIntent = new Intent(context, CallRingingService.class);
+        ringIntent.putExtra(EXTRA_CALL_ID, callId);
+        ringIntent.putExtra(EXTRA_CHAT_ID, chatId);
+        ringIntent.putExtra(EXTRA_CALLER_NAME, callerName);
+        ringIntent.putExtra(EXTRA_CALL_TYPE, callType);
+        context.startForegroundService(ringIntent);
+    }
+
+    // Builds the exact same rich (CallStyle, Answer/Decline) notification used both
+    // to alert the user and to satisfy CallRingingService's own startForeground()
+    // requirement. Previously the service posted a second, plain notification under
+    // the same NOTIFICATION_ID to keep itself in the foreground, which immediately
+    // overwrote this one and silently wiped out the Answer/Decline buttons.
+    public static Notification buildCallNotification(
+        Context context, String callId, String chatId, String callerName, String callType
+    ) {
         ensureChannel(context);
 
         Intent fullScreenIntent = new Intent(context, IncomingCallActivity.class);
@@ -68,7 +90,7 @@ public class IncomingCallNotifier {
         // category=call notifications to render Answer/Decline at all — plain
         // addAction() buttons on a CATEGORY_CALL notification can silently fail
         // to show on the collapsed/expanded views on some launchers.
-        NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
+        return new NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_call_notification)
             .setContentTitle(callerName)
             .setContentText(callType.equals("video") ? "Chamada de vídeo recebida" : "Chamada de áudio recebida")
@@ -78,14 +100,8 @@ public class IncomingCallNotifier {
             .setAutoCancel(false)
             .setFullScreenIntent(fullScreenPendingIntent, true)
             .setContentIntent(fullScreenPendingIntent)
-            .setStyle(NotificationCompat.CallStyle.forIncomingCall(caller, declinePendingIntent, fullScreenPendingIntent));
-
-        NotificationManager manager = context.getSystemService(NotificationManager.class);
-        manager.notify(NOTIFICATION_ID, builder.build());
-
-        Intent ringIntent = new Intent(context, CallRingingService.class);
-        ringIntent.putExtra(EXTRA_CALL_ID, callId);
-        context.startForegroundService(ringIntent);
+            .setStyle(NotificationCompat.CallStyle.forIncomingCall(caller, declinePendingIntent, fullScreenPendingIntent))
+            .build();
     }
 
     public static void dismiss(Context context) {

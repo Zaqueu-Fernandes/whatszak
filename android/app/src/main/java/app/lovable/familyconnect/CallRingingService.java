@@ -15,7 +15,6 @@ import android.os.Looper;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
 import androidx.annotation.Nullable;
-import androidx.core.app.NotificationCompat;
 
 public class CallRingingService extends Service {
 
@@ -29,12 +28,18 @@ public class CallRingingService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        Notification silentNotification = new NotificationCompat.Builder(this, IncomingCallNotifier.CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_call_notification)
-            .setContentTitle("Chamada em andamento")
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .build();
-        startForeground(IncomingCallNotifier.NOTIFICATION_ID, silentNotification);
+        // Reuse the exact same CallStyle notification IncomingCallNotifier already
+        // posted (same NOTIFICATION_ID) instead of building a plain placeholder here —
+        // a second, button-less notification under that id would silently replace the
+        // real one and wipe out the Answer/Decline actions.
+        String callId = intent.getStringExtra(IncomingCallNotifier.EXTRA_CALL_ID);
+        String chatId = intent.getStringExtra(IncomingCallNotifier.EXTRA_CHAT_ID);
+        String callerName = intent.getStringExtra(IncomingCallNotifier.EXTRA_CALLER_NAME);
+        String callType = intent.getStringExtra(IncomingCallNotifier.EXTRA_CALL_TYPE);
+        Notification callNotification = IncomingCallNotifier.buildCallNotification(
+            this, callId, chatId, callerName, callType
+        );
+        startForeground(IncomingCallNotifier.NOTIFICATION_ID, callNotification);
 
         startRingtone();
         startVibration();
