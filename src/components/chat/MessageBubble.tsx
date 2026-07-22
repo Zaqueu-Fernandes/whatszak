@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import { FileText, Download, Reply, Trash2, Share2, Forward, X, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { resolveMediaUrl } from "@/lib/media";
 
 interface ReplyInfo {
   id: string;
@@ -49,6 +50,20 @@ export default function MessageBubble({
 }: MessageBubbleProps) {
   const [showMenu, setShowMenu] = useState(false);
   const [revealed, setRevealed] = useState(false);
+  const [resolvedMediaUrl, setResolvedMediaUrl] = useState<string | null>(null);
+
+  // mediaUrl stores the raw Storage path (or, for older messages, an already
+  // pre-signed URL) rather than a ready-to-use link, so it can be re-signed
+  // here on every view instead of expiring an hour after it was sent.
+  useEffect(() => {
+    let cancelled = false;
+    resolveMediaUrl(mediaUrl).then((url) => {
+      if (!cancelled) setResolvedMediaUrl(url);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [mediaUrl]);
 
   // View-once message that has already been viewed by the recipient
   const isViewOnceConsumed = viewOnce && viewedAt;
@@ -125,12 +140,12 @@ export default function MessageBubble({
       case "image":
         return (
           <div>
-            {mediaUrl && (
+            {resolvedMediaUrl && (
               <img
-                src={mediaUrl}
+                src={resolvedMediaUrl}
                 alt="Imagem"
                 className="max-w-full rounded-md mb-1 cursor-pointer"
-                onClick={() => window.open(mediaUrl, "_blank")}
+                onClick={() => window.open(resolvedMediaUrl, "_blank")}
               />
             )}
             {content && <p className="text-sm break-words">{content}</p>}
@@ -139,9 +154,9 @@ export default function MessageBubble({
       case "audio":
         return (
           <div className="min-w-[200px]">
-            {mediaUrl && (
+            {resolvedMediaUrl && (
               <audio controls className="w-full max-w-[250px]" preload="metadata">
-                <source src={mediaUrl} type="audio/webm" />
+                <source src={resolvedMediaUrl} type="audio/webm" />
               </audio>
             )}
           </div>
@@ -149,7 +164,7 @@ export default function MessageBubble({
       case "file":
         return (
           <a
-            href={mediaUrl ?? "#"}
+            href={resolvedMediaUrl ?? "#"}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-2 p-2 rounded-md bg-background/50 hover:bg-background/80 transition-colors"

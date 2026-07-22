@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ArrowLeft, Send, Phone, Video, X, Eye, EyeOff } from "lucide-react";
 import { useNotificationSound, useBrowserNotifications } from "@/hooks/use-notifications";
 import { sendPushToUser } from "@/lib/push";
+import { resolveMediaUrl } from "@/lib/media";
 import MessageBubble from "@/components/chat/MessageBubble";
 import AttachmentPicker from "@/components/chat/AttachmentPicker";
 import AudioRecorder from "@/components/chat/AudioRecorder";
@@ -240,13 +241,6 @@ export default function ChatScreen() {
     }
   };
 
-  const getSignedUrl = async (path: string): Promise<string | null> => {
-    const { data } = await supabase.storage
-      .from("media")
-      .createSignedUrl(path, 3600);
-    return data?.signedUrl ?? null;
-  };
-
   const handleSend = async () => {
     if (!newMessage.trim() || !chatId || !user || sending) return;
     setSending(true);
@@ -283,14 +277,12 @@ export default function ChatScreen() {
       return;
     }
 
-    const signedUrl = await getSignedUrl(filePath);
-
     await supabase.from("messages").insert({
       chat_id: chatId,
       sender_id: user.id,
       encrypted_content: type === "file" ? file.name : null,
       message_type: type,
-      media_url: signedUrl,
+      media_url: filePath,
     });
     notifyOtherParticipants(type === "image" ? "📷 Imagem" : "📎 Arquivo");
     setSending(false);
@@ -309,13 +301,11 @@ export default function ChatScreen() {
       return;
     }
 
-    const signedUrl = await getSignedUrl(filePath);
-
     await supabase.from("messages").insert({
       chat_id: chatId,
       sender_id: user.id,
       message_type: "audio",
-      media_url: signedUrl,
+      media_url: filePath,
     });
     notifyOtherParticipants("🎵 Áudio");
     setSending(false);
@@ -362,17 +352,21 @@ export default function ChatScreen() {
     const msg = messages.find((m) => m.id === msgId);
     if (!msg) return;
 
+    // msg.media_url is a raw Storage path (or an old pre-signed URL), not a
+    // link that's actually fetchable outside the app — resolve it first.
+    const mediaLink = msg.media_url ? await resolveMediaUrl(msg.media_url) : null;
+
     const text =
       msg.message_type === "text"
         ? msg.encrypted_content ?? ""
-        : msg.media_url ?? msg.encrypted_content ?? "";
+        : mediaLink ?? msg.encrypted_content ?? "";
 
     if (navigator.share) {
       try {
         await navigator.share({
           title: "Mensagem",
           text,
-          url: msg.media_url ?? undefined,
+          url: mediaLink ?? undefined,
         });
       } catch {
         // user cancelled
