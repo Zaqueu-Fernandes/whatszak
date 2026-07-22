@@ -45,30 +45,48 @@ export async function resolveMediaUrl(storedValue: string | null): Promise<strin
   return data.signedUrl;
 }
 
-const DEFAULT_MAX_FILE_SIZE_MB = 50;
+export interface UserLimitProfile {
+  maxFileSizeMb: number | null; // null = no limit
+  mediaRetentionDays: number | null; // null = never expires by age
+  autoDeleteOnView: boolean; // e.g. the "Privacidade" profile
+}
+
+const DEFAULT_LIMIT_PROFILE: UserLimitProfile = {
+  maxFileSizeMb: 50,
+  mediaRetentionDays: null,
+  autoDeleteOnView: false,
+};
 const SETTINGS_CACHE_MS = 5 * 60 * 1000;
-let limitCache: { userId: string; mb: number | null; fetchedAt: number } | null = null;
+let limitProfileCache: { userId: string; profile: UserLimitProfile; fetchedAt: number } | null = null;
 
 // limit_profiles/profiles.limit_profile_id aren't in the generated Supabase
 // types yet (added via a manual migration, generated types need
 // `supabase gen types` against the linked project to pick it up) — same
 // `as any` pattern already used for push_tokens.
-//
-// Returns null to mean "no limit" (the user's profile is Ilimitado / has no
-// max_file_size_mb configured).
-export async function getUserMaxFileSizeMb(userId: string): Promise<number | null> {
-  if (limitCache && limitCache.userId === userId && Date.now() - limitCache.fetchedAt < SETTINGS_CACHE_MS) {
-    return limitCache.mb;
+export async function getUserLimitProfile(userId: string): Promise<UserLimitProfile> {
+  if (
+    limitProfileCache &&
+    limitProfileCache.userId === userId &&
+    Date.now() - limitProfileCache.fetchedAt < SETTINGS_CACHE_MS
+  ) {
+    return limitProfileCache.profile;
   }
 
   const { data, error } = await supabase
     .from("profiles" as any)
-    .select("limit_profiles ( max_file_size_mb )")
+    .select("limit_profiles ( max_file_size_mb, media_retention_days, auto_delete_on_view )")
     .eq("id", userId)
     .single();
 
-  const profile = !error && data ? (data as any).limit_profiles : undefined;
-  const mb = profile ? profile.max_file_size_mb : DEFAULT_MAX_FILE_SIZE_MB;
-  limitCache = { userId, mb, fetchedAt: Date.now() };
-  return mb;
+  const raw = !error && data ? (data as any).limit_profiles : undefined;
+  const profile: UserLimitProfile = raw
+    ? {
+        maxFileSizeMb: raw.max_file_size_mb,
+        mediaRetentionDays: raw.media_retention_days,
+        autoDeleteOnView: !!raw.auto_delete_on_view,
+      }
+    : DEFAULT_LIMIT_PROFILE;
+
+  limitProfileCache = { userId, profile, fetchedAt: Date.now() };
+  return profile;
 }

@@ -8,7 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ArrowLeft, Send, Phone, Video, X, Eye, EyeOff } from "lucide-react";
 import { useNotificationSound, useBrowserNotifications } from "@/hooks/use-notifications";
 import { sendPushToUser } from "@/lib/push";
-import { resolveMediaUrl, getUserMaxFileSizeMb } from "@/lib/media";
+import { resolveMediaUrl, getUserLimitProfile } from "@/lib/media";
 import MessageBubble from "@/components/chat/MessageBubble";
 import AttachmentPicker from "@/components/chat/AttachmentPicker";
 import AudioRecorder from "@/components/chat/AudioRecorder";
@@ -266,7 +266,7 @@ export default function ChatScreen() {
 
   const checkFileSizeLimit = async (file: File | Blob): Promise<boolean> => {
     if (!user) return false;
-    const maxMb = await getUserMaxFileSizeMb(user.id);
+    const { maxFileSizeMb: maxMb } = await getUserLimitProfile(user.id);
     if (maxMb != null && file.size > maxMb * 1024 * 1024) {
       toast({
         title: "Arquivo muito grande",
@@ -282,6 +282,12 @@ export default function ChatScreen() {
     if (!chatId || !user || sending) return;
     if (!(await checkFileSizeLimit(file))) return;
     setSending(true);
+
+    // Users on a profile with auto_delete_on_view (e.g. "Privacidade") get
+    // every media message treated as view-once automatically, on top of
+    // whatever the sender chose with the manual toggle.
+    const { autoDeleteOnView } = await getUserLimitProfile(user.id);
+    const isViewOnce = viewOnce || autoDeleteOnView;
 
     const ext = file.name.split(".").pop() ?? "bin";
     const filePath = `${user.id}/${chatId}/${Date.now()}.${ext}`;
@@ -299,8 +305,10 @@ export default function ChatScreen() {
       encrypted_content: type === "file" ? file.name : null,
       message_type: type,
       media_url: filePath,
+      view_once: isViewOnce,
     });
     notifyOtherParticipants(type === "image" ? "📷 Imagem" : "📎 Arquivo");
+    setViewOnce(false);
     setSending(false);
   };
 
@@ -308,6 +316,9 @@ export default function ChatScreen() {
     if (!chatId || !user) return;
     if (!(await checkFileSizeLimit(blob))) return;
     setSending(true);
+
+    const { autoDeleteOnView } = await getUserLimitProfile(user.id);
+    const isViewOnce = viewOnce || autoDeleteOnView;
 
     const filePath = `${user.id}/${chatId}/${Date.now()}.webm`;
 
@@ -323,8 +334,10 @@ export default function ChatScreen() {
       sender_id: user.id,
       message_type: "audio",
       media_url: filePath,
+      view_once: isViewOnce,
     });
     notifyOtherParticipants("🎵 Áudio");
+    setViewOnce(false);
     setSending(false);
   };
 
@@ -347,12 +360,20 @@ export default function ChatScreen() {
   };
 
   const handleViewOnceOpen = async (msgId: string) => {
-    await supabase.rpc("mark_view_once_viewed" as any, { _message_id: msgId });
+    // Marks viewed_at AND actually deletes the file from Storage (the viewer
+    // isn't the file's owner, so this has to run with elevated privileges —
+    // see the delete-viewed-media Edge Function).
     setMessages((prev) =>
       prev.map((m) =>
-        m.id === msgId ? { ...m, viewed_at: new Date().toISOString() } : m
+        m.id === msgId ? { ...m, viewed_at: new Date().toISOString(), media_url: null } : m
       )
     );
+    const { error } = await supabase.functions.invoke("delete-viewed-media", {
+      body: { message_id: msgId },
+    });
+    if (error) {
+      console.error("[ViewOnce] delete-viewed-media error:", error);
+    }
   };
 
   const handleReply = (msgId: string) => {
