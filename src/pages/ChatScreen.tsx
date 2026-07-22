@@ -8,7 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ArrowLeft, Send, Phone, Video, X, Eye, EyeOff } from "lucide-react";
 import { useNotificationSound, useBrowserNotifications } from "@/hooks/use-notifications";
 import { sendPushToUser } from "@/lib/push";
-import { resolveMediaUrl } from "@/lib/media";
+import { resolveMediaUrl, getMaxFileSizeMb } from "@/lib/media";
 import MessageBubble from "@/components/chat/MessageBubble";
 import AttachmentPicker from "@/components/chat/AttachmentPicker";
 import AudioRecorder from "@/components/chat/AudioRecorder";
@@ -26,6 +26,7 @@ interface Message {
   media_url: string | null;
   created_at: string;
   deleted_at: string | null;
+  media_expired_at: string | null;
   reply_to_id: string | null;
   view_once: boolean;
   viewed_at: string | null;
@@ -263,8 +264,22 @@ export default function ChatScreen() {
     setSending(false);
   };
 
+  const checkFileSizeLimit = async (file: File | Blob): Promise<boolean> => {
+    const maxMb = await getMaxFileSizeMb();
+    if (file.size > maxMb * 1024 * 1024) {
+      toast({
+        title: "Arquivo muito grande",
+        description: `O limite atual é ${maxMb}MB. Esse arquivo tem ${(file.size / (1024 * 1024)).toFixed(1)}MB.`,
+        variant: "destructive",
+      });
+      return false;
+    }
+    return true;
+  };
+
   const handleFileSelected = async (file: File, type: "image" | "file") => {
     if (!chatId || !user || sending) return;
+    if (!(await checkFileSizeLimit(file))) return;
     setSending(true);
 
     const ext = file.name.split(".").pop() ?? "bin";
@@ -290,6 +305,7 @@ export default function ChatScreen() {
 
   const handleAudioRecorded = async (blob: Blob) => {
     if (!chatId || !user) return;
+    if (!(await checkFileSizeLimit(blob))) return;
     setSending(true);
 
     const filePath = `${user.id}/${chatId}/${Date.now()}.webm`;
@@ -478,6 +494,7 @@ export default function ChatScreen() {
             isMine={msg.sender_id === user?.id}
             createdAt={msg.created_at}
             deleted={!!msg.deleted_at}
+            mediaExpired={!!msg.media_expired_at}
             viewOnce={msg.view_once}
             viewedAt={msg.viewed_at}
             replyTo={getReplyInfo(msg)}

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { format } from "date-fns";
-import { FileText, Download, Reply, Trash2, Share2, Forward, X, Eye, EyeOff } from "lucide-react";
+import { FileText, Download, Reply, Trash2, Share2, Forward, X, Eye, EyeOff, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { resolveMediaUrl } from "@/lib/media";
 
@@ -19,6 +19,7 @@ interface MessageBubbleProps {
   isMine: boolean;
   createdAt: string;
   deleted: boolean;
+  mediaExpired?: boolean;
   viewOnce?: boolean;
   viewedAt?: string | null;
   replyTo?: ReplyInfo | null;
@@ -38,6 +39,7 @@ export default function MessageBubble({
   isMine,
   createdAt,
   deleted,
+  mediaExpired,
   viewOnce,
   viewedAt,
   replyTo,
@@ -136,6 +138,14 @@ export default function MessageBubble({
   };
 
   const renderContent = () => {
+    if (mediaExpired && messageType !== "text") {
+      return (
+        <p className="text-sm italic text-muted-foreground flex items-center gap-1">
+          <Clock className="h-3.5 w-3.5" /> Mídia expirada
+        </p>
+      );
+    }
+
     switch (messageType) {
       case "image":
         return (

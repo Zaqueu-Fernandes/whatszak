@@ -44,3 +44,24 @@ export async function resolveMediaUrl(storedValue: string | null): Promise<strin
   });
   return data.signedUrl;
 }
+
+const DEFAULT_MAX_FILE_SIZE_MB = 50;
+const SETTINGS_CACHE_MS = 5 * 60 * 1000;
+let maxFileSizeCache: { mb: number; fetchedAt: number } | null = null;
+
+// app_settings isn't in the generated Supabase types yet (added via a manual
+// migration, generated types need `supabase gen types` against the linked
+// project to pick it up) — same `as any` pattern already used for push_tokens.
+export async function getMaxFileSizeMb(): Promise<number> {
+  if (maxFileSizeCache && Date.now() - maxFileSizeCache.fetchedAt < SETTINGS_CACHE_MS) {
+    return maxFileSizeCache.mb;
+  }
+  const { data, error } = await supabase
+    .from("app_settings" as any)
+    .select("max_file_size_mb")
+    .eq("id", 1)
+    .single();
+  const mb = !error && data ? (data as any).max_file_size_mb : DEFAULT_MAX_FILE_SIZE_MB;
+  maxFileSizeCache = { mb, fetchedAt: Date.now() };
+  return mb;
+}

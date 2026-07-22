@@ -8,6 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ArrowLeft, Trash2, Shield, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import AppSettingsCard from "@/components/admin/AppSettingsCard";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -109,7 +110,9 @@ export default function AdminUsers() {
       </header>
 
       <div className="flex-1 p-4 space-y-3">
-        <div className="flex items-center gap-2 text-muted-foreground mb-2">
+        <AppSettingsCard />
+
+        <div className="flex items-center gap-2 text-muted-foreground mb-2 pt-2">
           <Users className="h-4 w-4" />
           <span className="text-sm font-medium">{users.length} usuários</span>
         </div>
