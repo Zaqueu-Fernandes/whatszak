@@ -6,6 +6,7 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Build;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.Person;
@@ -21,8 +22,6 @@ public class IncomingCallNotifier {
     public static final String EXTRA_CALLER_NAME = "caller_name";
     public static final String EXTRA_CALL_TYPE = "call_type";
 
-    public static final String ACTION_DECLINE = "app.lovable.familyconnect.action.DECLINE_CALL";
-    public static final String ACTION_ANSWER = "app.lovable.familyconnect.action.ANSWER_CALL";
     public static final String ACTION_CALL_ENDED = "app.lovable.familyconnect.action.CALL_ENDED";
 
     public static void notifyIncomingCall(Context context, Map<String, String> data) {
@@ -72,27 +71,24 @@ public class IncomingCallNotifier {
             PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
         );
 
-        Intent declineIntent = new Intent(context, CallActionReceiver.class);
-        declineIntent.setAction(ACTION_DECLINE);
-        declineIntent.putExtra(EXTRA_CALL_ID, callId);
-        PendingIntent declinePendingIntent = PendingIntent.getBroadcast(
+        // Both actions open MainActivity directly (via the whatszak://call deep
+        // link it already declares an intent-filter for) rather than routing
+        // through a BroadcastReceiver that then calls startActivity(). Some OEMs
+        // (Motorola included) block that second-hop activity launch while the app
+        // is backgrounded/killed, which silently swallowed the answer action.
+        // MainActivity itself dismisses the notification/stops the ringing once
+        // it receives the deep link — see MainActivity.handleCallDeepLink.
+        PendingIntent declinePendingIntent = PendingIntent.getActivity(
             context,
-            callId.hashCode(),
-            declineIntent,
+            callId.hashCode() + 2,
+            buildCallDeepLinkIntent(context, "decline", callId, callType),
             PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
         );
 
-        // The CallStyle "answer" action must actually answer the call (fire the
-        // whatszak://call?action=answer deep link), not just reopen the
-        // full-screen Activity — that just moved the double-tap one screen over.
-        Intent answerIntent = new Intent(context, CallActionReceiver.class);
-        answerIntent.setAction(ACTION_ANSWER);
-        answerIntent.putExtra(EXTRA_CALL_ID, callId);
-        answerIntent.putExtra(EXTRA_CALL_TYPE, callType);
-        PendingIntent answerPendingIntent = PendingIntent.getBroadcast(
+        PendingIntent answerPendingIntent = PendingIntent.getActivity(
             context,
             callId.hashCode() + 1,
-            answerIntent,
+            buildCallDeepLinkIntent(context, "answer", callId, callType),
             PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
         );
 
@@ -117,6 +113,19 @@ public class IncomingCallNotifier {
             .setContentIntent(fullScreenPendingIntent)
             .setStyle(NotificationCompat.CallStyle.forIncomingCall(caller, declinePendingIntent, answerPendingIntent))
             .build();
+    }
+
+    private static Intent buildCallDeepLinkIntent(Context context, String action, String callId, String callType) {
+        Uri uri = Uri.parse("whatszak://call")
+            .buildUpon()
+            .appendQueryParameter("action", action)
+            .appendQueryParameter("call_id", callId)
+            .appendQueryParameter("call_type", callType)
+            .build();
+        Intent intent = new Intent(Intent.ACTION_VIEW, uri);
+        intent.setPackage(context.getPackageName());
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        return intent;
     }
 
     public static void dismiss(Context context) {

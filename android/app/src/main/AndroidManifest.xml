@@ -45,10 +45,6 @@
             android:exported="false"
             android:foregroundServiceType="phoneCall" />
 
-        <receiver
-            android:name=".CallActionReceiver"
-            android:exported="false" />
-
         <!-- Replace the plugin's default FCM service with our own subclass so we can
              detect incoming-call payloads even while the app process is killed. -->
         <service

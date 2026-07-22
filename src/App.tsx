@@ -4,7 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { App as CapacitorApp } from "@capacitor/app";
 import type { CallMode } from "@/hooks/use-webrtc";
 import SplashScreen from "@/components/SplashScreen";
@@ -94,6 +94,33 @@ function IncomingCallHandler() {
     }
   };
 
+  // On a cold start (app was killed), the whatszak://call deep link can fire
+  // before AuthContext's supabase.auth.getSession() resolves. answerCall/rejectCall
+  // need a real userId (it's used as sender_id for ICE candidates, RLS-checked
+  // against auth.uid()) — calling them with userId still "" makes every ICE
+  // candidate insert/query fail with 400s, so the call opens but never gets media.
+  // Queue the action and run it once `user` is actually available instead.
+  const pendingDeepLinkRef = useRef<{ action: string; callId: string; callType: CallMode } | null>(null);
+
+  const processDeepLink = useCallback((action: string, callId: string, callType: CallMode) => {
+    if (action === "answer") {
+      answerCall(callId, callType);
+      dismissIncoming();
+    } else if (action === "decline") {
+      rejectCall(callId);
+      dismissIncoming();
+    }
+  }, [answerCall, rejectCall, dismissIncoming]);
+
+  useEffect(() => {
+    if (user && pendingDeepLinkRef.current) {
+      const pending = pendingDeepLinkRef.current;
+      pendingDeepLinkRef.current = null;
+      console.log("[DeepLink] user now ready, processing queued action:", pending.action);
+      processDeepLink(pending.action, pending.callId, pending.callType);
+    }
+  }, [user, processDeepLink]);
+
   // Handles the native full-screen incoming-call UI's Accept/Decline actions,
   // delivered as a "whatszak://call?..." deep link even when the app was killed.
   useEffect(() => {
@@ -111,21 +138,20 @@ function IncomingCallHandler() {
       const callId = parsed.searchParams.get("call_id");
       const callType = (parsed.searchParams.get("call_type") as CallMode) || "audio";
       console.log("[DeepLink] parsed action:", action, "callId:", callId, "callType:", callType);
-      if (!callId) return;
+      if (!callId || !action) return;
 
-      if (action === "answer") {
-        answerCall(callId, callType);
-        dismissIncoming();
-      } else if (action === "decline") {
-        rejectCall(callId);
-        dismissIncoming();
+      if (!user) {
+        console.log("[DeepLink] user not ready yet, queueing action:", action);
+        pendingDeepLinkRef.current = { action, callId, callType };
+        return;
       }
+      processDeepLink(action, callId, callType);
     });
 
     return () => {
       listenerPromise.then((listener) => listener.remove());
     };
-  }, [answerCall, rejectCall, dismissIncoming]);
+  }, [user, processDeepLink]);
 
   return (
     <>
