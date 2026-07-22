@@ -98,6 +98,7 @@ function IncomingCallHandler() {
   // delivered as a "whatszak://call?..." deep link even when the app was killed.
   useEffect(() => {
     const listenerPromise = CapacitorApp.addListener("appUrlOpen", ({ url }) => {
+      console.log("[DeepLink] appUrlOpen fired, url:", url, "user:", user?.id);
       let parsed: URL;
       try {
         parsed = new URL(url);
@@ -109,6 +110,7 @@ function IncomingCallHandler() {
       const action = parsed.searchParams.get("action");
       const callId = parsed.searchParams.get("call_id");
       const callType = (parsed.searchParams.get("call_type") as CallMode) || "audio";
+      console.log("[DeepLink] parsed action:", action, "callId:", callId, "callType:", callType);
       if (!callId) return;
 
       if (action === "answer") {

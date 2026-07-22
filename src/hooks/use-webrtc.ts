@@ -45,6 +45,10 @@ export function useWebRTC({ userId, onRemoteStream, onCallEnded }: UseWebRTCOpti
   const localStreamRef = useRef<MediaStream | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const peerIdRef = useRef<string | null>(null);
+  // ICE candidates that arrive over Realtime before the remote description
+  // has been applied yet (addIceCandidate throws in that state) are queued
+  // here and flushed right after setRemoteDescription resolves.
+  const pendingCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
 
   const cleanup = useCallback(() => {
     localStreamRef.current?.getTracks().forEach((t) => t.stop());
@@ -55,11 +59,24 @@ export function useWebRTC({ userId, onRemoteStream, onCallEnded }: UseWebRTCOpti
       supabase.removeChannel(channelRef.current);
       channelRef.current = null;
     }
+    pendingCandidatesRef.current = [];
     setCallStatus("idle");
     setCallId(null);
     setCallMode("audio");
     peerIdRef.current = null;
   }, []);
+
+  const flushPendingCandidates = async (pc: RTCPeerConnection) => {
+    const queued = pendingCandidatesRef.current;
+    pendingCandidatesRef.current = [];
+    for (const candidate of queued) {
+      try {
+        await pc.addIceCandidate(new RTCIceCandidate(candidate));
+      } catch (e) {
+        console.warn("ICE candidate error (queued):", e);
+      }
+    }
+  };
 
   const getLocalStream = async (mode: CallMode) => {
     const constraints: MediaStreamConstraints = {
@@ -117,6 +134,7 @@ export function useWebRTC({ userId, onRemoteStream, onCallEnded }: UseWebRTCOpti
           const pc = pcRef.current;
           if (pc && pc.signalingState === "have-local-offer") {
             await pc.setRemoteDescription(new RTCSessionDescription(call.answer));
+            await flushPendingCandidates(pc);
             setCallStatus("answered");
           }
         }
@@ -133,9 +151,17 @@ export function useWebRTC({ userId, onRemoteStream, onCallEnded }: UseWebRTCOpti
         filter: `call_id=eq.${currentCallId}`,
       }, async (payload) => {
         const row = payload.new as any;
-        if (row.sender_id !== userId && pcRef.current) {
+        const pc = pcRef.current;
+        if (row.sender_id !== userId && pc) {
+          if (!pc.remoteDescription) {
+            // Remote description isn't applied yet — queue it instead of
+            // letting addIceCandidate throw InvalidStateError.
+            console.log("[WebRTC] queueing ICE candidate (remote description not set yet)");
+            pendingCandidatesRef.current.push(row.candidate);
+            return;
+          }
           try {
-            await pcRef.current.addIceCandidate(new RTCIceCandidate(row.candidate));
+            await pc.addIceCandidate(new RTCIceCandidate(row.candidate));
           } catch (e) {
             console.warn("ICE candidate error:", e);
           }
@@ -207,6 +233,7 @@ export function useWebRTC({ userId, onRemoteStream, onCallEnded }: UseWebRTCOpti
   };
 
   const answerCall = async (incomingCallId: string, mode: CallMode = "audio") => {
+    console.log("[WebRTC] answerCall called, incomingCallId:", incomingCallId, "mode:", mode, "userId:", userId);
     try {
       setCallMode(mode);
       setCallStatus("answered");
@@ -232,6 +259,7 @@ export function useWebRTC({ userId, onRemoteStream, onCallEnded }: UseWebRTCOpti
       subscribeToSignaling(incomingCallId, "callee");
 
       await pc.setRemoteDescription(new RTCSessionDescription(call.offer as unknown as RTCSessionDescriptionInit));
+      await flushPendingCandidates(pc);
 
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);

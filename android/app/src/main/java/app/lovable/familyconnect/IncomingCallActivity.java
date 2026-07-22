@@ -8,11 +8,14 @@ import android.content.IntentFilter;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.util.Log;
 import android.widget.Button;
 import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
 
 public class IncomingCallActivity extends AppCompatActivity {
+
+    private static final String TAG = "WhatszakCall";
 
     private String callId;
     private String chatId;
@@ -29,6 +32,7 @@ public class IncomingCallActivity extends AppCompatActivity {
         chatId = getIntent().getStringExtra(IncomingCallNotifier.EXTRA_CHAT_ID);
         callType = getIntent().getStringExtra(IncomingCallNotifier.EXTRA_CALL_TYPE);
         String callerName = getIntent().getStringExtra(IncomingCallNotifier.EXTRA_CALLER_NAME);
+        Log.d(TAG, "IncomingCallActivity.onCreate callId=" + callId + " callType=" + callType);
 
         TextView nameView = findViewById(R.id.caller_name);
         TextView typeView = findViewById(R.id.call_type_label);
@@ -94,6 +98,7 @@ public class IncomingCallActivity extends AppCompatActivity {
     }
 
     private void finishWithAction(String action) {
+        Log.d(TAG, "IncomingCallActivity.finishWithAction action=" + action + " callId=" + callId);
         IncomingCallNotifier.dismiss(this);
 
         if (callId != null) {

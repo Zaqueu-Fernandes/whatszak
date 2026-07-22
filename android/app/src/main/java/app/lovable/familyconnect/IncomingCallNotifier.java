@@ -22,6 +22,7 @@ public class IncomingCallNotifier {
     public static final String EXTRA_CALL_TYPE = "call_type";
 
     public static final String ACTION_DECLINE = "app.lovable.familyconnect.action.DECLINE_CALL";
+    public static final String ACTION_ANSWER = "app.lovable.familyconnect.action.ANSWER_CALL";
     public static final String ACTION_CALL_ENDED = "app.lovable.familyconnect.action.CALL_ENDED";
 
     public static void notifyIncomingCall(Context context, Map<String, String> data) {
@@ -81,6 +82,20 @@ public class IncomingCallNotifier {
             PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
         );
 
+        // The CallStyle "answer" action must actually answer the call (fire the
+        // whatszak://call?action=answer deep link), not just reopen the
+        // full-screen Activity — that just moved the double-tap one screen over.
+        Intent answerIntent = new Intent(context, CallActionReceiver.class);
+        answerIntent.setAction(ACTION_ANSWER);
+        answerIntent.putExtra(EXTRA_CALL_ID, callId);
+        answerIntent.putExtra(EXTRA_CALL_TYPE, callType);
+        PendingIntent answerPendingIntent = PendingIntent.getBroadcast(
+            context,
+            callId.hashCode() + 1,
+            answerIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+        );
+
         Person caller = new Person.Builder()
             .setName(callerName)
             .setImportant(true)
@@ -100,7 +115,7 @@ public class IncomingCallNotifier {
             .setAutoCancel(false)
             .setFullScreenIntent(fullScreenPendingIntent, true)
             .setContentIntent(fullScreenPendingIntent)
-            .setStyle(NotificationCompat.CallStyle.forIncomingCall(caller, declinePendingIntent, fullScreenPendingIntent))
+            .setStyle(NotificationCompat.CallStyle.forIncomingCall(caller, declinePendingIntent, answerPendingIntent))
             .build();
     }
 
