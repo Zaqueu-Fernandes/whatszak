@@ -42,12 +42,15 @@ export default function ActiveCallOverlay({
   useEffect(() => {
     if (localVideoRef.current && localStream) {
       localVideoRef.current.srcObject = localStream;
+      localVideoRef.current.play().catch((e) => console.warn("[Call] local video play() failed:", e));
     }
   }, [localStream]);
 
   useEffect(() => {
     if (remoteVideoRef.current && remoteStream) {
+      console.log("[Call] attaching remote stream to video element, tracks:", remoteStream.getTracks().map((t) => t.kind));
       remoteVideoRef.current.srcObject = remoteStream;
+      remoteVideoRef.current.play().catch((e) => console.warn("[Call] remote video play() failed:", e));
     }
   }, [remoteStream]);
 
@@ -81,10 +84,14 @@ export default function ActiveCallOverlay({
   // For audio-only calls, play remote stream through an audio element
   useEffect(() => {
     if (!isVideo && remoteStream) {
+      console.log("[Call] attaching remote stream to audio element, tracks:", remoteStream.getTracks().map((t) => t.kind));
       const audio = new Audio();
       audio.srcObject = remoteStream;
-      audio.autoplay = true;
-      return () => { audio.srcObject = null; };
+      audio.play().catch((e) => console.warn("[Call] remote audio play() failed:", e));
+      return () => {
+        audio.pause();
+        audio.srcObject = null;
+      };
     }
   }, [remoteStream, isVideo]);
 

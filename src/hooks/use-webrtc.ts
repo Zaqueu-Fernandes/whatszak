@@ -6,6 +6,25 @@ const ICE_SERVERS: RTCConfiguration = {
   iceServers: [
     { urls: "stun:stun.l.google.com:19302" },
     { urls: "stun:stun1.l.google.com:19302" },
+    // TURN relay — required for calls to connect when the two devices are on
+    // different networks (mobile data, different Wi-Fi, carrier-grade NAT).
+    // STUN alone only works when a direct/reflexive path is possible, which
+    // is not the common case for two phones calling each other.
+    {
+      urls: "turn:openrelay.metered.ca:80",
+      username: "openrelayproject",
+      credential: "openrelayproject",
+    },
+    {
+      urls: "turn:openrelay.metered.ca:443",
+      username: "openrelayproject",
+      credential: "openrelayproject",
+    },
+    {
+      urls: "turn:openrelay.metered.ca:443?transport=tcp",
+      username: "openrelayproject",
+      credential: "openrelayproject",
+    },
   ],
 };
 
@@ -67,12 +86,14 @@ export function useWebRTC({ userId, onRemoteStream, onCallEnded }: UseWebRTCOpti
     };
 
     pc.ontrack = (event) => {
+      console.log("[WebRTC] ontrack fired, kind:", event.track.kind, "streams:", event.streams.length);
       if (event.streams[0]) {
         onRemoteStream(event.streams[0]);
       }
     };
 
     pc.oniceconnectionstatechange = () => {
+      console.log("[WebRTC] iceConnectionState:", pc.iceConnectionState);
       if (pc.iceConnectionState === "disconnected" || pc.iceConnectionState === "failed") {
         endCall(currentCallId);
       }
