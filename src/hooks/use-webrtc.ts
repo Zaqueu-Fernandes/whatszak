@@ -290,26 +290,32 @@ export function useWebRTC({ userId, onRemoteStream, onCallEnded }: UseWebRTCOpti
     }
   };
 
-  const endCall = async (overrideCallId?: string) => {
+  const endCall = (overrideCallId?: string) => {
     const id = overrideCallId ?? callId;
     const peerId = peerIdRef.current;
-    if (id) {
-      await supabase
-        .from("calls")
-        .update({ status: "ended", ended_at: new Date().toISOString() })
-        .eq("id", id);
 
-      // Notify the other side natively even if their app is closed, so the
-      // native ringing/full-screen call UI doesn't keep going indefinitely.
-      if (peerId) {
-        sendPushToUser(peerId, "Chamada encerrada", "A chamada foi encerrada", {
-          call_id: id,
-          type: "call_ended",
-        }).catch((err) => console.error("[PUSH] call_ended push error:", err));
-      }
-    }
+    // Close the call screen immediately — don't make the user wait on the
+    // network round-trip to Supabase before the "Hang up" tap takes effect.
+    // The DB update and push notification still happen, just in the background.
     cleanup();
     onCallEnded();
+
+    if (id) {
+      supabase
+        .from("calls")
+        .update({ status: "ended", ended_at: new Date().toISOString() })
+        .eq("id", id)
+        .then(() => {
+          // Notify the other side natively even if their app is closed, so the
+          // native ringing/full-screen call UI doesn't keep going indefinitely.
+          if (peerId) {
+            sendPushToUser(peerId, "Chamada encerrada", "A chamada foi encerrada", {
+              call_id: id,
+              type: "call_ended",
+            }).catch((err) => console.error("[PUSH] call_ended push error:", err));
+          }
+        });
+    }
   };
 
   const rejectCall = async (incomingCallId: string) => {
