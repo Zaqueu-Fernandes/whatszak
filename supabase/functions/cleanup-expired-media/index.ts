@@ -28,47 +28,68 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
-    const { data: settings, error: settingsError } = await adminClient
-      .from("app_settings")
-      .select("media_retention_days")
-      .eq("id", 1)
-      .single();
-
-    if (settingsError) {
-      throw new Error(`Failed to load app_settings: ${settingsError.message}`);
+    // Retention is per-user (via their limit profile), not a single global
+    // value, so compute a cutoff date per profile instead of one for everyone.
+    const { data: limitProfiles, error: profilesError } = await adminClient
+      .from("limit_profiles")
+      .select("id, media_retention_days");
+    if (profilesError) {
+      throw new Error(`Failed to load limit_profiles: ${profilesError.message}`);
     }
 
-    const retentionDays = settings?.media_retention_days;
-    if (!retentionDays) {
-      console.log("[cleanup-expired-media] No retention configured, skipping.");
-      return new Response(JSON.stringify({ message: "Retention disabled, nothing to do" }), {
+    const cutoffByProfileId = new Map<string, string>();
+    for (const p of limitProfiles ?? []) {
+      if (p.media_retention_days) {
+        cutoffByProfileId.set(
+          p.id,
+          new Date(Date.now() - p.media_retention_days * 24 * 60 * 60 * 1000).toISOString()
+        );
+      }
+    }
+
+    if (cutoffByProfileId.size === 0) {
+      console.log("[cleanup-expired-media] No profile has retention configured, skipping.");
+      return new Response(JSON.stringify({ expired: 0 }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000).toISOString();
-    console.log(`[cleanup-expired-media] Retention: ${retentionDays} days, cutoff: ${cutoff}`);
+    const { data: userProfiles, error: userProfilesError } = await adminClient
+      .from("profiles")
+      .select("id, limit_profile_id");
+    if (userProfilesError) {
+      throw new Error(`Failed to load profiles: ${userProfilesError.message}`);
+    }
+    const limitProfileIdByUserId = new Map(
+      (userProfiles ?? []).map((u) => [u.id, u.limit_profile_id as string | null])
+    );
 
-    const { data: expiredMessages, error: fetchError } = await adminClient
+    const { data: candidates, error: fetchError } = await adminClient
       .from("messages")
-      .select("id, media_url")
+      .select("id, sender_id, media_url, created_at")
       .not("media_url", "is", null)
       .is("media_expired_at", null)
-      .is("deleted_at", null)
-      .lt("created_at", cutoff);
-
+      .is("deleted_at", null);
     if (fetchError) {
-      throw new Error(`Failed to query expired messages: ${fetchError.message}`);
+      throw new Error(`Failed to query candidate messages: ${fetchError.message}`);
     }
 
-    if (!expiredMessages || expiredMessages.length === 0) {
+    const expired = (candidates ?? []).filter((m) => {
+      const limitProfileId = limitProfileIdByUserId.get(m.sender_id);
+      if (!limitProfileId) return false;
+      const cutoff = cutoffByProfileId.get(limitProfileId);
+      if (!cutoff) return false; // that user's profile has no retention set
+      return m.created_at < cutoff;
+    });
+
+    if (expired.length === 0) {
       console.log("[cleanup-expired-media] Nothing to expire.");
       return new Response(JSON.stringify({ expired: 0 }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const paths = expiredMessages
+    const paths = expired
       .map((m) => (m.media_url ? extractStoragePath(m.media_url) : null))
       .filter((p): p is string => !!p);
 
@@ -83,14 +104,13 @@ Deno.serve(async (req) => {
     const { error: updateError } = await adminClient
       .from("messages")
       .update({ media_url: null, media_expired_at: now })
-      .in("id", expiredMessages.map((m) => m.id));
-
+      .in("id", expired.map((m) => m.id));
     if (updateError) {
       throw new Error(`Failed to mark messages expired: ${updateError.message}`);
     }
 
-    console.log(`[cleanup-expired-media] Expired ${expiredMessages.length} message(s).`);
-    return new Response(JSON.stringify({ expired: expiredMessages.length }), {
+    console.log(`[cleanup-expired-media] Expired ${expired.length} message(s).`);
+    return new Response(JSON.stringify({ expired: expired.length }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {

@@ -1,0 +1,184 @@
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Sliders } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+
+// limit_profiles isn't in the generated Supabase types yet — same `as any`
+// pattern already used elsewhere for tables added outside a full type regen.
+interface LimitProfile {
+  id: string;
+  name: string;
+  max_file_size_mb: number | null;
+  media_retention_days: number | null;
+}
+
+interface ProfileFormState {
+  sizeEnabled: boolean;
+  sizeInput: string;
+  retentionEnabled: boolean;
+  retentionInput: string;
+}
+
+function toFormState(p: LimitProfile): ProfileFormState {
+  return {
+    sizeEnabled: p.max_file_size_mb != null,
+    sizeInput: String(p.max_file_size_mb ?? 50),
+    retentionEnabled: p.media_retention_days != null,
+    retentionInput: String(p.media_retention_days ?? 90),
+  };
+}
+
+export default function LimitProfilesCard() {
+  const { toast } = useToast();
+  const [profiles, setProfiles] = useState<LimitProfile[]>([]);
+  const [forms, setForms] = useState<Record<string, ProfileFormState>>({});
+  const [loading, setLoading] = useState(true);
+  const [savingId, setSavingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchProfiles();
+  }, []);
+
+  const fetchProfiles = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("limit_profiles" as any)
+      .select("id, name, max_file_size_mb, media_retention_days")
+      .order("created_at", { ascending: true });
+
+    if (!error && data) {
+      const list = data as unknown as LimitProfile[];
+      setProfiles(list);
+      const nextForms: Record<string, ProfileFormState> = {};
+      list.forEach((p) => (nextForms[p.id] = toFormState(p)));
+      setForms(nextForms);
+    }
+    setLoading(false);
+  };
+
+  const updateForm = (id: string, patch: Partial<ProfileFormState>) => {
+    setForms((prev) => ({ ...prev, [id]: { ...prev[id], ...patch } }));
+  };
+
+  const handleSave = async (profile: LimitProfile) => {
+    const form = forms[profile.id];
+    const sizeMb = form.sizeEnabled ? parseInt(form.sizeInput, 10) : null;
+    const retentionDays = form.retentionEnabled ? parseInt(form.retentionInput, 10) : null;
+
+    if (form.sizeEnabled && (!sizeMb || sizeMb <= 0)) {
+      toast({ title: "Valor inválido", description: "Informe um tamanho máximo maior que zero.", variant: "destructive" });
+      return;
+    }
+    if (form.retentionEnabled && (!retentionDays || retentionDays <= 0)) {
+      toast({ title: "Valor inválido", description: "Informe um prazo em dias maior que zero.", variant: "destructive" });
+      return;
+    }
+
+    setSavingId(profile.id);
+    const { error } = await supabase
+      .from("limit_profiles" as any)
+      .update({ max_file_size_mb: sizeMb, media_retention_days: retentionDays })
+      .eq("id", profile.id);
+    setSavingId(null);
+
+    if (error) {
+      toast({ title: "Erro ao salvar", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: `Perfil "${profile.name}" atualizado` });
+      fetchProfiles();
+    }
+  };
+
+  if (loading) {
+    return (
+      <Card>
+        <CardContent className="flex justify-center py-6">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Sliders className="h-4 w-4" /> Perfis de limite
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {profiles.map((profile) => {
+          const form = forms[profile.id];
+          if (!form) return null;
+          return (
+            <div key={profile.id} className="space-y-4 rounded-lg border border-border p-3">
+              <p className="font-medium">{profile.name}</p>
+
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor={`size-toggle-${profile.id}`} className="text-sm">
+                    Limitar tamanho de arquivo
+                  </Label>
+                  <Switch
+                    id={`size-toggle-${profile.id}`}
+                    checked={form.sizeEnabled}
+                    onCheckedChange={(checked) => updateForm(profile.id, { sizeEnabled: checked })}
+                  />
+                </div>
+                {form.sizeEnabled ? (
+                  <Input
+                    type="number"
+                    min={1}
+                    value={form.sizeInput}
+                    onChange={(e) => updateForm(profile.id, { sizeInput: e.target.value })}
+                    placeholder="Tamanho máximo (MB)"
+                  />
+                ) : (
+                  <p className="text-xs text-muted-foreground">Sem limite de tamanho.</p>
+                )}
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor={`retention-toggle-${profile.id}`} className="text-sm">
+                    Excluir mídias automaticamente
+                  </Label>
+                  <Switch
+                    id={`retention-toggle-${profile.id}`}
+                    checked={form.retentionEnabled}
+                    onCheckedChange={(checked) => updateForm(profile.id, { retentionEnabled: checked })}
+                  />
+                </div>
+                {form.retentionEnabled ? (
+                  <Input
+                    type="number"
+                    min={1}
+                    value={form.retentionInput}
+                    onChange={(e) => updateForm(profile.id, { retentionInput: e.target.value })}
+                    placeholder="Dias até expirar"
+                  />
+                ) : (
+                  <p className="text-xs text-muted-foreground">Mídias nunca expiram.</p>
+                )}
+              </div>
+
+              <Button
+                size="sm"
+                onClick={() => handleSave(profile)}
+                disabled={savingId === profile.id}
+                className="w-full"
+              >
+                {savingId === profile.id ? "Salvando..." : "Salvar"}
+              </Button>
+            </div>
+          );
+        })}
+      </CardContent>
+    </Card>
+  );
+}

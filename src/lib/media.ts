@@ -47,21 +47,28 @@ export async function resolveMediaUrl(storedValue: string | null): Promise<strin
 
 const DEFAULT_MAX_FILE_SIZE_MB = 50;
 const SETTINGS_CACHE_MS = 5 * 60 * 1000;
-let maxFileSizeCache: { mb: number; fetchedAt: number } | null = null;
+let limitCache: { userId: string; mb: number | null; fetchedAt: number } | null = null;
 
-// app_settings isn't in the generated Supabase types yet (added via a manual
-// migration, generated types need `supabase gen types` against the linked
-// project to pick it up) — same `as any` pattern already used for push_tokens.
-export async function getMaxFileSizeMb(): Promise<number> {
-  if (maxFileSizeCache && Date.now() - maxFileSizeCache.fetchedAt < SETTINGS_CACHE_MS) {
-    return maxFileSizeCache.mb;
+// limit_profiles/profiles.limit_profile_id aren't in the generated Supabase
+// types yet (added via a manual migration, generated types need
+// `supabase gen types` against the linked project to pick it up) — same
+// `as any` pattern already used for push_tokens.
+//
+// Returns null to mean "no limit" (the user's profile is Ilimitado / has no
+// max_file_size_mb configured).
+export async function getUserMaxFileSizeMb(userId: string): Promise<number | null> {
+  if (limitCache && limitCache.userId === userId && Date.now() - limitCache.fetchedAt < SETTINGS_CACHE_MS) {
+    return limitCache.mb;
   }
+
   const { data, error } = await supabase
-    .from("app_settings" as any)
-    .select("max_file_size_mb")
-    .eq("id", 1)
+    .from("profiles" as any)
+    .select("limit_profiles ( max_file_size_mb )")
+    .eq("id", userId)
     .single();
-  const mb = !error && data ? (data as any).max_file_size_mb : DEFAULT_MAX_FILE_SIZE_MB;
-  maxFileSizeCache = { mb, fetchedAt: Date.now() };
+
+  const profile = !error && data ? (data as any).limit_profiles : undefined;
+  const mb = profile ? profile.max_file_size_mb : DEFAULT_MAX_FILE_SIZE_MB;
+  limitCache = { userId, mb, fetchedAt: Date.now() };
   return mb;
 }

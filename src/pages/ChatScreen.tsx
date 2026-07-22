@@ -8,7 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ArrowLeft, Send, Phone, Video, X, Eye, EyeOff } from "lucide-react";
 import { useNotificationSound, useBrowserNotifications } from "@/hooks/use-notifications";
 import { sendPushToUser } from "@/lib/push";
-import { resolveMediaUrl, getMaxFileSizeMb } from "@/lib/media";
+import { resolveMediaUrl, getUserMaxFileSizeMb } from "@/lib/media";
 import MessageBubble from "@/components/chat/MessageBubble";
 import AttachmentPicker from "@/components/chat/AttachmentPicker";
 import AudioRecorder from "@/components/chat/AudioRecorder";
@@ -265,11 +265,12 @@ export default function ChatScreen() {
   };
 
   const checkFileSizeLimit = async (file: File | Blob): Promise<boolean> => {
-    const maxMb = await getMaxFileSizeMb();
-    if (file.size > maxMb * 1024 * 1024) {
+    if (!user) return false;
+    const maxMb = await getUserMaxFileSizeMb(user.id);
+    if (maxMb != null && file.size > maxMb * 1024 * 1024) {
       toast({
         title: "Arquivo muito grande",
-        description: `O limite atual é ${maxMb}MB. Esse arquivo tem ${(file.size / (1024 * 1024)).toFixed(1)}MB.`,
+        description: `O limite do seu plano é ${maxMb}MB. Esse arquivo tem ${(file.size / (1024 * 1024)).toFixed(1)}MB.`,
         variant: "destructive",
       });
       return false;
