@@ -15,6 +15,7 @@ interface LimitProfile {
   name: string;
   max_file_size_mb: number | null;
   media_retention_days: number | null;
+  auto_delete_on_view: boolean;
 }
 
 interface ProfileFormState {
@@ -22,6 +23,7 @@ interface ProfileFormState {
   sizeInput: string;
   retentionEnabled: boolean;
   retentionInput: string;
+  autoDeleteOnView: boolean;
 }
 
 function toFormState(p: LimitProfile): ProfileFormState {
@@ -30,6 +32,7 @@ function toFormState(p: LimitProfile): ProfileFormState {
     sizeInput: String(p.max_file_size_mb ?? 50),
     retentionEnabled: p.media_retention_days != null,
     retentionInput: String(p.media_retention_days ?? 90),
+    autoDeleteOnView: p.auto_delete_on_view,
   };
 }
 
@@ -48,7 +51,7 @@ export default function LimitProfilesCard() {
     setLoading(true);
     const { data, error } = await supabase
       .from("limit_profiles" as any)
-      .select("id, name, max_file_size_mb, media_retention_days")
+      .select("id, name, max_file_size_mb, media_retention_days, auto_delete_on_view")
       .order("created_at", { ascending: true });
 
     if (!error && data) {
@@ -82,7 +85,11 @@ export default function LimitProfilesCard() {
     setSavingId(profile.id);
     const { error } = await supabase
       .from("limit_profiles" as any)
-      .update({ max_file_size_mb: sizeMb, media_retention_days: retentionDays })
+      .update({
+        max_file_size_mb: sizeMb,
+        media_retention_days: retentionDays,
+        auto_delete_on_view: form.autoDeleteOnView,
+      })
       .eq("id", profile.id);
     setSavingId(null);
 
@@ -145,8 +152,26 @@ export default function LimitProfilesCard() {
 
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
+                  <Label htmlFor={`view-toggle-${profile.id}`} className="text-sm">
+                    Excluir mídia assim que for visualizada
+                  </Label>
+                  <Switch
+                    id={`view-toggle-${profile.id}`}
+                    checked={form.autoDeleteOnView}
+                    onCheckedChange={(checked) => updateForm(profile.id, { autoDeleteOnView: checked })}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {form.autoDeleteOnView
+                    ? "Toda mídia enviada some para sempre logo depois que o destinatário abrir e sair da visualização — como visualização única automática, sem o remetente precisar escolher."
+                    : "Desativado: mídias continuam disponíveis normalmente após visualizadas."}
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
                   <Label htmlFor={`retention-toggle-${profile.id}`} className="text-sm">
-                    Excluir mídias automaticamente
+                    Excluir mídias automaticamente por prazo
                   </Label>
                   <Switch
                     id={`retention-toggle-${profile.id}`}
@@ -163,7 +188,9 @@ export default function LimitProfilesCard() {
                     placeholder="Dias até expirar"
                   />
                 ) : (
-                  <p className="text-xs text-muted-foreground">Mídias nunca expiram.</p>
+                  <p className="text-xs text-muted-foreground">
+                    Sem prazo por dias{form.autoDeleteOnView ? " (mídias já somem ao serem vistas, acima)" : ": mídias nunca expiram"}.
+                  </p>
                 )}
               </div>
 
