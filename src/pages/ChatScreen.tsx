@@ -15,6 +15,7 @@ import CameraCapture from "@/components/chat/CameraCapture";
 import AudioRecorder from "@/components/chat/AudioRecorder";
 import ActiveCallOverlay from "@/components/call/ActiveCallOverlay";
 import ForwardMessageDialog from "@/components/chat/ForwardMessageDialog";
+import AvatarViewer from "@/components/AvatarViewer";
 import { useWebRTC } from "@/hooks/use-webrtc";
 import type { CallMode } from "@/hooks/use-webrtc";
 import { toast } from "@/hooks/use-toast";
@@ -50,6 +51,7 @@ export default function ChatScreen() {
   const [deletedForMe, setDeletedForMe] = useState<Set<string>>(new Set());
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [forwardingMsg, setForwardingMsg] = useState<Message | null>(null);
+  const [avatarViewerOpen, setAvatarViewerOpen] = useState(false);
   const [viewOnce, setViewOnce] = useState(false);
   // "Privacidade" limit profile already forces every media message to
   // view-once server-side (see handleFileSelected/handleAudioRecorded) —
@@ -484,12 +486,18 @@ export default function ChatScreen() {
         <Button variant="ghost" size="icon" onClick={() => navigate("/")} className="text-primary-foreground hover:bg-primary/80">
           <ArrowLeft className="h-5 w-5" />
         </Button>
-        <Avatar className="h-10 w-10">
-          <AvatarImage src={chatInfo?.avatar_url} />
-          <AvatarFallback className="bg-primary-foreground/20 text-primary-foreground text-sm">
-            {initials}
-          </AvatarFallback>
-        </Avatar>
+        <button
+          onClick={() => chatInfo?.avatar_url && setAvatarViewerOpen(true)}
+          className="shrink-0"
+          disabled={!chatInfo?.avatar_url}
+        >
+          <Avatar className="h-10 w-10">
+            <AvatarImage src={chatInfo?.avatar_url} />
+            <AvatarFallback className="bg-primary-foreground/20 text-primary-foreground text-sm">
+              {initials}
+            </AvatarFallback>
+          </Avatar>
+        </button>
         <div className="flex-1">
           <p className="font-semibold">{chatInfo?.name ?? "..."}</p>
         </div>
@@ -536,6 +544,15 @@ export default function ChatScreen() {
         <ForwardMessageDialog
           message={forwardingMsg}
           onClose={() => setForwardingMsg(null)}
+        />
+      )}
+
+      {/* Profile photo viewer */}
+      {avatarViewerOpen && chatInfo?.avatar_url && (
+        <AvatarViewer
+          name={chatInfo.name ?? "Usuário"}
+          avatarUrl={chatInfo.avatar_url}
+          onClose={() => setAvatarViewerOpen(false)}
         />
       )}
 
