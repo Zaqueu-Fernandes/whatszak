@@ -109,7 +109,11 @@ export default function ChatScreen() {
         filter: `chat_id=eq.${chatId}`,
       }, (payload) => {
         const newMsg = payload.new as Message;
-        setMessages((prev) => [...prev, newMsg]);
+        // Own messages are already added optimistically right after insert
+        // (see handleSend/handleFileSelected/handleAudioRecorded) — skip if
+        // this echo for the same row already landed, so it doesn't show
+        // twice.
+        setMessages((prev) => (prev.some((m) => m.id === newMsg.id) ? prev : [...prev, newMsg]));
         if (newMsg.sender_id !== user?.id) {
           playSound();
           showNotification(
@@ -262,14 +266,22 @@ export default function ChatScreen() {
     const isViewOnce = viewOnce;
     setReplyingTo(null);
     setViewOnce(false);
-    await supabase.from("messages").insert({
-      chat_id: chatId,
-      sender_id: user.id,
-      encrypted_content: content,
-      message_type: "text",
-      reply_to_id: replyId,
-      view_once: isViewOnce,
-    });
+    const { data } = await supabase
+      .from("messages")
+      .insert({
+        chat_id: chatId,
+        sender_id: user.id,
+        encrypted_content: content,
+        message_type: "text",
+        reply_to_id: replyId,
+        view_once: isViewOnce,
+      })
+      .select()
+      .single();
+    // Add it locally right away instead of waiting for the realtime echo —
+    // that round-trip could take a few seconds, which read as "my message
+    // never showed up" (the INSERT handler above dedupes this by id).
+    if (data) setMessages((prev) => [...prev, data as Message]);
     // Fire push notification (don't block UI but log errors)
     notifyOtherParticipants(content).catch((err) => console.error("[PUSH] notify error:", err));
     setSending(false);
@@ -310,14 +322,19 @@ export default function ChatScreen() {
       return;
     }
 
-    await supabase.from("messages").insert({
-      chat_id: chatId,
-      sender_id: user.id,
-      encrypted_content: type === "file" ? file.name : null,
-      message_type: type,
-      media_url: filePath,
-      view_once: isViewOnce,
-    });
+    const { data } = await supabase
+      .from("messages")
+      .insert({
+        chat_id: chatId,
+        sender_id: user.id,
+        encrypted_content: type === "file" ? file.name : null,
+        message_type: type,
+        media_url: filePath,
+        view_once: isViewOnce,
+      })
+      .select()
+      .single();
+    if (data) setMessages((prev) => [...prev, data as Message]);
     notifyOtherParticipants(type === "image" ? "📷 Imagem" : type === "video" ? "🎥 Vídeo" : "📎 Arquivo");
     setViewOnce(false);
     setSending(false);
@@ -340,13 +357,18 @@ export default function ChatScreen() {
       return;
     }
 
-    await supabase.from("messages").insert({
-      chat_id: chatId,
-      sender_id: user.id,
-      message_type: "audio",
-      media_url: filePath,
-      view_once: isViewOnce,
-    });
+    const { data } = await supabase
+      .from("messages")
+      .insert({
+        chat_id: chatId,
+        sender_id: user.id,
+        message_type: "audio",
+        media_url: filePath,
+        view_once: isViewOnce,
+      })
+      .select()
+      .single();
+    if (data) setMessages((prev) => [...prev, data as Message]);
     notifyOtherParticipants("🎵 Áudio");
     setViewOnce(false);
     setSending(false);

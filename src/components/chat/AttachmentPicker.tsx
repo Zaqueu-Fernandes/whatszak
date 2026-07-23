@@ -9,8 +9,27 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 interface AttachmentPickerProps {
-  onFileSelected: (file: File, type: "image" | "file") => void;
+  onFileSelected: (file: File, type: "image" | "video" | "file") => void;
   disabled?: boolean;
+}
+
+const VIDEO_EXTENSIONS = ["mp4", "mov", "webm", "mkv", "3gp", "avi", "m4v"];
+const IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "gif", "webp", "heic", "heif", "bmp"];
+
+// The generic "Arquivo" picker (accept="*/*") is the only way to attach an
+// existing video (there's no gallery video option, only live camera
+// capture) — without this, a video picked there got message_type "file",
+// which renders as a plain external-open link instead of playing inline
+// (and, for view-once, completely bypassed the viewer's protections).
+// file.type is usually reliable but can be blank from some mobile file
+// pickers, hence the extension fallback.
+function classifyFile(file: File): "image" | "video" | "file" {
+  if (file.type.startsWith("video/")) return "video";
+  if (file.type.startsWith("image/")) return "image";
+  const ext = file.name.split(".").pop()?.toLowerCase();
+  if (ext && VIDEO_EXTENSIONS.includes(ext)) return "video";
+  if (ext && IMAGE_EXTENSIONS.includes(ext)) return "image";
+  return "file";
 }
 
 export default function AttachmentPicker({ onFileSelected, disabled }: AttachmentPickerProps) {
@@ -37,7 +56,7 @@ export default function AttachmentPicker({ onFileSelected, disabled }: Attachmen
         className="hidden"
         onChange={(e) => {
           const file = e.target.files?.[0];
-          if (file) onFileSelected(file, "file");
+          if (file) onFileSelected(file, classifyFile(file));
           e.target.value = "";
         }}
       />
