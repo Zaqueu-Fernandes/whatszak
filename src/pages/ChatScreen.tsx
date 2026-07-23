@@ -11,6 +11,7 @@ import { sendPushToUser } from "@/lib/push";
 import { resolveMediaUrl, getUserLimitProfile } from "@/lib/media";
 import MessageBubble from "@/components/chat/MessageBubble";
 import AttachmentPicker from "@/components/chat/AttachmentPicker";
+import CameraCapture from "@/components/chat/CameraCapture";
 import AudioRecorder from "@/components/chat/AudioRecorder";
 import ActiveCallOverlay from "@/components/call/ActiveCallOverlay";
 import ForwardMessageDialog from "@/components/chat/ForwardMessageDialog";
@@ -278,7 +279,7 @@ export default function ChatScreen() {
     return true;
   };
 
-  const handleFileSelected = async (file: File, type: "image" | "file") => {
+  const handleFileSelected = async (file: File, type: "image" | "video" | "file") => {
     if (!chatId || !user || sending) return;
     if (!(await checkFileSizeLimit(file))) return;
     setSending(true);
@@ -307,7 +308,7 @@ export default function ChatScreen() {
       media_url: filePath,
       view_once: isViewOnce,
     });
-    notifyOtherParticipants(type === "image" ? "📷 Imagem" : "📎 Arquivo");
+    notifyOtherParticipants(type === "image" ? "📷 Imagem" : type === "video" ? "🎥 Vídeo" : "📎 Arquivo");
     setViewOnce(false);
     setSending(false);
   };
@@ -541,6 +542,7 @@ export default function ChatScreen() {
             <p className="text-xs text-muted-foreground truncate">
               {replyingTo.message_type === "audio" ? "🎵 Áudio" :
                replyingTo.message_type === "image" ? "📷 Imagem" :
+               replyingTo.message_type === "video" ? "🎥 Vídeo" :
                replyingTo.message_type === "file" ? "📎 Arquivo" :
                replyingTo.encrypted_content ?? ""}
             </p>
@@ -565,6 +567,7 @@ export default function ChatScreen() {
       {/* Input */}
       <div className="flex items-center gap-1 border-t border-border bg-card px-2 py-2">
         <AttachmentPicker onFileSelected={handleFileSelected} disabled={sending} />
+        <CameraCapture onCaptured={handleFileSelected} disabled={sending} />
         <Button
           variant="ghost"
           size="icon"

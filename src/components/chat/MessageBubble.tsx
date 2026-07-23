@@ -125,6 +125,8 @@ export default function MessageBubble({
         ? "🎵 Áudio"
         : replyTo.messageType === "image"
         ? "📷 Imagem"
+        : replyTo.messageType === "video"
+        ? "🎥 Vídeo"
         : replyTo.messageType === "file"
         ? "📎 Arquivo"
         : replyTo.content ?? "";
@@ -156,6 +158,19 @@ export default function MessageBubble({
                 alt="Imagem"
                 className="max-w-full rounded-md mb-1 cursor-pointer"
                 onClick={() => window.open(resolvedMediaUrl, "_blank")}
+              />
+            )}
+            {content && <p className="text-sm break-words">{content}</p>}
+          </div>
+        );
+      case "video":
+        return (
+          <div>
+            {resolvedMediaUrl && (
+              <video
+                src={resolvedMediaUrl}
+                controls
+                className="max-w-full rounded-md mb-1"
               />
             )}
             {content && <p className="text-sm break-words">{content}</p>}
