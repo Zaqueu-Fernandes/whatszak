@@ -45,6 +45,10 @@ export function useWebRTC({ userId, onRemoteStream, onCallEnded }: UseWebRTCOpti
   const localStreamRef = useRef<MediaStream | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const peerIdRef = useRef<string | null>(null);
+  // Tracked alongside peerIdRef so the "call ended" push (sent after cleanup()
+  // has already reset call state) can still tell send-push which chat this
+  // call belongs to, letting it verify the caller/callee actually share it.
+  const chatIdRef = useRef<string | null>(null);
   // ICE candidates that arrive over Realtime before the remote description
   // has been applied yet (addIceCandidate throws in that state) are queued
   // here and flushed right after setRemoteDescription resolves.
@@ -64,6 +68,7 @@ export function useWebRTC({ userId, onRemoteStream, onCallEnded }: UseWebRTCOpti
     setCallId(null);
     setCallMode("audio");
     peerIdRef.current = null;
+    chatIdRef.current = null;
   }, []);
 
   const flushPendingCandidates = async (pc: RTCPeerConnection) => {
@@ -198,6 +203,7 @@ export function useWebRTC({ userId, onRemoteStream, onCallEnded }: UseWebRTCOpti
       const currentCallId = call.id;
       setCallId(currentCallId);
       peerIdRef.current = calleeId;
+      chatIdRef.current = chatId;
 
       // Send push notification to callee for when app is minimized/closed
       const { data: callerProfile } = await supabase
@@ -252,6 +258,7 @@ export function useWebRTC({ userId, onRemoteStream, onCallEnded }: UseWebRTCOpti
         return;
       }
       peerIdRef.current = call.caller_id;
+      chatIdRef.current = call.chat_id;
 
       const pc = createPeerConnection(incomingCallId);
       stream.getTracks().forEach((track) => pc.addTrack(track, stream));
@@ -293,6 +300,7 @@ export function useWebRTC({ userId, onRemoteStream, onCallEnded }: UseWebRTCOpti
   const endCall = (overrideCallId?: string) => {
     const id = overrideCallId ?? callId;
     const peerId = peerIdRef.current;
+    const chatId = chatIdRef.current;
 
     // Close the call screen immediately — don't make the user wait on the
     // network round-trip to Supabase before the "Hang up" tap takes effect.
@@ -312,6 +320,7 @@ export function useWebRTC({ userId, onRemoteStream, onCallEnded }: UseWebRTCOpti
             sendPushToUser(peerId, "Chamada encerrada", "A chamada foi encerrada", {
               call_id: id,
               type: "call_ended",
+              ...(chatId ? { chat_id: chatId } : {}),
             }).catch((err) => console.error("[PUSH] call_ended push error:", err));
           }
         });

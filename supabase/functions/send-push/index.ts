@@ -113,8 +113,31 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get recipient's push tokens using service role
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
+
+    // Any authenticated user could otherwise push an arbitrary title/body to
+    // any recipient_id — require proof the caller and recipient actually
+    // share a chat (via the chat_id already carried in every real call site's
+    // `data` payload), unless the caller is just pushing to themselves (e.g.
+    // the "test notification" button).
+    if (recipient_id !== claimsData.user.id) {
+      const chatId = (pushData as Record<string, string> | undefined)?.chat_id;
+      const isParticipant = async (userId: string) => {
+        const { data } = await adminClient.rpc("is_chat_participant", {
+          _user_id: userId,
+          _chat_id: chatId,
+        });
+        return !!data;
+      };
+      if (!chatId || !(await isParticipant(claimsData.user.id)) || !(await isParticipant(recipient_id))) {
+        return new Response(JSON.stringify({ error: "Forbidden" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
+    // Get recipient's push tokens using service role
     console.log("[send-push] Looking up tokens for:", recipient_id);
     const { data: tokens, error: tokensError } = await adminClient
       .from("push_tokens")
