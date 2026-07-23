@@ -1,74 +1,51 @@
 import { useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Camera, Image, Video } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { Camera } from "lucide-react";
 
 interface CameraCaptureProps {
-  onCaptured: (file: File, type: "image" | "video") => void;
+  onCaptured: (file: File, type: "image" | "video") => void | Promise<void>;
   disabled?: boolean;
 }
 
+function classifyMedia(file: File): "image" | "video" {
+  return file.type.startsWith("video/") ? "video" : "image";
+}
+
+// Forcing the native camera via `capture="environment"` proved unreliable
+// on this Android WebView (kept falling back to the gallery/file chooser
+// regardless of accept type — see project notes). Dropping `capture`
+// entirely and letting Android's own picker sheet handle it gives a real
+// "Camera" option alongside Gallery/Files, reliably. Supports multi-select;
+// each file is sent sequentially since ChatScreen's send handlers guard
+// against overlapping in-flight sends.
 export default function CameraCapture({ onCaptured, disabled }: CameraCaptureProps) {
-  const photoInputRef = useRef<HTMLInputElement>(null);
-  const videoInputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   return (
     <>
-      {/* Two single-purpose inputs, not one with accept="image/*,video/*" —
-          Android's WebView only reliably jumps straight into the native
-          camera (skipping the gallery/file-chooser fallback) when the accept
-          type is unambiguous. */}
       <input
-        ref={photoInputRef}
+        ref={inputRef}
         type="file"
-        accept="image/*"
-        capture="environment"
+        accept="image/*,video/*"
+        multiple
         className="hidden"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file) onCaptured(file, "image");
+        onChange={async (e) => {
+          const files = Array.from(e.target.files ?? []);
           e.target.value = "";
+          for (const file of files) {
+            await onCaptured(file, classifyMedia(file));
+          }
         }}
       />
-      <input
-        ref={videoInputRef}
-        type="file"
-        accept="video/*"
-        capture="environment"
-        className="hidden"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file) onCaptured(file, "video");
-          e.target.value = "";
-        }}
-      />
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            size="icon"
-            variant="ghost"
-            className="rounded-full h-10 w-10 text-muted-foreground"
-            disabled={disabled}
-          >
-            <Camera className="h-5 w-5" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent side="top" align="start" className="min-w-[160px]">
-          <DropdownMenuItem onClick={() => photoInputRef.current?.click()}>
-            <Image className="mr-2 h-4 w-4 text-primary" />
-            Foto
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => videoInputRef.current?.click()}>
-            <Video className="mr-2 h-4 w-4 text-primary" />
-            Vídeo
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <Button
+        size="icon"
+        variant="ghost"
+        className="rounded-full h-10 w-10 text-muted-foreground"
+        disabled={disabled}
+        onClick={() => inputRef.current?.click()}
+      >
+        <Camera className="h-5 w-5" />
+      </Button>
     </>
   );
 }
