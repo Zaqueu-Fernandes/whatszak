@@ -10,6 +10,7 @@ import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useNotificationSound, useBrowserNotifications } from "@/hooks/use-notifications";
 import { toast } from "sonner";
+import PullToRefresh from "@/components/PullToRefresh";
 
 interface ChatItem {
   id: string;
@@ -190,7 +191,7 @@ export default function ChatList() {
       </header>
 
       {/* Chat list */}
-      <div className="flex-1 overflow-y-auto">
+      <PullToRefresh onRefresh={loadChats} className="flex-1">
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
@@ -249,7 +250,7 @@ export default function ChatList() {
             );
           })
         )}
-      </div>
+      </PullToRefresh>
 
       {/* Bottom nav */}
       <nav className="flex items-center justify-around border-t border-border bg-card py-2">
