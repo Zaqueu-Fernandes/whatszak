@@ -477,9 +477,9 @@ export default function ChatScreen() {
   const visibleMessages = messages.filter((m) => !deletedForMe.has(m.id));
 
   return (
-    <div className="flex min-h-screen flex-col bg-chat-bg">
+    <div className="flex h-screen h-dvh flex-col overflow-hidden bg-chat-bg">
       {/* Header */}
-      <header className="flex items-center gap-3 bg-primary px-3 py-2 text-primary-foreground">
+      <header className="shrink-0 flex items-center gap-3 bg-primary px-3 py-2 text-primary-foreground">
         <Button variant="ghost" size="icon" onClick={() => navigate("/")} className="text-primary-foreground hover:bg-primary/80">
           <ArrowLeft className="h-5 w-5" />
         </Button>
@@ -538,7 +538,7 @@ export default function ChatScreen() {
       )}
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-3 py-4 space-y-2">
+      <div className="flex-1 min-h-0 overflow-y-auto px-3 py-4 space-y-2">
         {visibleMessages.map((msg) => (
           <MessageBubble
             key={msg.id}
@@ -566,7 +566,7 @@ export default function ChatScreen() {
 
       {/* Reply preview */}
       {replyingTo && (
-        <div className="flex items-center gap-2 bg-muted px-3 py-2 border-t border-border">
+        <div className="shrink-0 flex items-center gap-2 bg-muted px-3 py-2 border-t border-border">
           <div className="flex-1 border-l-2 border-primary pl-2">
             <p className="text-xs font-semibold text-primary">
               {replyingTo.sender_id === user?.id ? "Você" : senderNames[replyingTo.sender_id] ?? "Usuário"}
@@ -587,7 +587,7 @@ export default function ChatScreen() {
 
       {/* View once indicator */}
       {viewOnce && !autoDeleteOnView && (
-        <div className="flex items-center gap-2 bg-primary/10 px-3 py-1.5 border-t border-border">
+        <div className="shrink-0 flex items-center gap-2 bg-primary/10 px-3 py-1.5 border-t border-border">
           <EyeOff className="h-3.5 w-3.5 text-primary" />
           <span className="text-xs text-primary font-medium flex-1">Visualização única ativada</span>
           <Button variant="ghost" size="icon" onClick={() => setViewOnce(false)} className="h-6 w-6">
@@ -596,7 +596,7 @@ export default function ChatScreen() {
         </div>
       )}
       {/* Input */}
-      <div className="flex items-center gap-1 border-t border-border bg-card px-2 py-2">
+      <div className="shrink-0 flex items-center gap-1 border-t border-border bg-card px-2 py-2">
         <AttachmentPicker onFileSelected={handleFileSelected} disabled={sending} />
         <CameraCapture onCaptured={handleFileSelected} disabled={sending} />
         {!autoDeleteOnView && (
