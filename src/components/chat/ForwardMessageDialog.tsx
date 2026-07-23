@@ -45,7 +45,7 @@ export default function ForwardMessageDialog({ message, onClose }: ForwardMessag
     const chatIds = participants.map((p) => p.chat_id);
     const { data: chatList } = await supabase
       .from("chats")
-      .select("id, name, is_group")
+      .select("id, name, is_group, avatar_url")
       .in("id", chatIds);
 
     if (!chatList) return;
@@ -54,7 +54,7 @@ export default function ForwardMessageDialog({ message, onClose }: ForwardMessag
 
     for (const chat of chatList) {
       if (chat.is_group) {
-        options.push({ id: chat.id, name: chat.name ?? "Grupo" });
+        options.push({ id: chat.id, name: chat.name ?? "Grupo", avatar_url: chat.avatar_url ?? undefined });
       } else {
         const { data: otherParticipants } = await supabase
           .from("chat_participants")

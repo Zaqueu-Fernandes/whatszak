@@ -88,7 +88,7 @@ export default function ChatList() {
 
     // Fetch all data in parallel instead of sequentially per chat
     const [chatsRes, allParticipantsRes, allMessagesRes, unreadRes] = await Promise.all([
-      supabase.from("chats").select("id, name, is_group").in("id", chatIds),
+      supabase.from("chats").select("id, name, is_group, avatar_url").in("id", chatIds),
       supabase.from("chat_participants").select("chat_id, user_id").in("chat_id", chatIds).neq("user_id", user.id),
       supabase.from("messages").select("chat_id, encrypted_content, created_at, sender_id, is_read").in("chat_id", chatIds).order("created_at", { ascending: false }),
       supabase.from("messages").select("chat_id, id").in("chat_id", chatIds).eq("is_read", false).neq("sender_id", user.id),
@@ -144,7 +144,7 @@ export default function ChatList() {
         is_group: chat.is_group,
         last_message: lastMsg?.encrypted_content ?? undefined,
         last_message_time: lastMsg?.created_at ?? undefined,
-        avatar_url: (!chat.is_group && profile?.avatar_url) ? profile.avatar_url : undefined,
+        avatar_url: chat.is_group ? chat.avatar_url ?? undefined : profile?.avatar_url ?? undefined,
         other_user_name: !chat.is_group ? profile?.name ?? chat.name ?? undefined : undefined,
         unread_count: unreadMap.get(chat.id) ?? 0,
       };
