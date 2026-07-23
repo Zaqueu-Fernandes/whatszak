@@ -16,6 +16,7 @@ import AudioRecorder from "@/components/chat/AudioRecorder";
 import ActiveCallOverlay from "@/components/call/ActiveCallOverlay";
 import ForwardMessageDialog from "@/components/chat/ForwardMessageDialog";
 import AvatarViewer from "@/components/AvatarViewer";
+import GroupSettingsDialog from "@/components/chat/GroupSettingsDialog";
 import { useWebRTC } from "@/hooks/use-webrtc";
 import type { CallMode } from "@/hooks/use-webrtc";
 import { toast } from "@/hooks/use-toast";
@@ -52,6 +53,7 @@ export default function ChatScreen() {
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [forwardingMsg, setForwardingMsg] = useState<Message | null>(null);
   const [avatarViewerOpen, setAvatarViewerOpen] = useState(false);
+  const [groupSettingsOpen, setGroupSettingsOpen] = useState(false);
   const [viewOnce, setViewOnce] = useState(false);
   // "Privacidade" limit profile already forces every media message to
   // view-once server-side (see handleFileSelected/handleAudioRecorded) —
@@ -162,14 +164,14 @@ export default function ChatScreen() {
 
     const { data: chat } = await supabase
       .from("chats")
-      .select("name, is_group")
+      .select("name, is_group, avatar_url")
       .eq("id", chatId)
       .single();
 
     if (!chat) return;
 
     if (chat.is_group) {
-      setChatInfo({ name: chat.name ?? "Grupo", is_group: true });
+      setChatInfo({ name: chat.name ?? "Grupo", avatar_url: chat.avatar_url ?? undefined, is_group: true });
     } else {
       const { data: participants } = await supabase
         .from("chat_participants")
@@ -487,9 +489,12 @@ export default function ChatScreen() {
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <button
-          onClick={() => chatInfo?.avatar_url && setAvatarViewerOpen(true)}
+          onClick={() => {
+            if (chatInfo?.is_group) setGroupSettingsOpen(true);
+            else if (chatInfo?.avatar_url) setAvatarViewerOpen(true);
+          }}
           className="shrink-0"
-          disabled={!chatInfo?.avatar_url}
+          disabled={!chatInfo?.is_group && !chatInfo?.avatar_url}
         >
           <Avatar className="h-10 w-10">
             <AvatarImage src={chatInfo?.avatar_url} />
@@ -498,9 +503,13 @@ export default function ChatScreen() {
             </AvatarFallback>
           </Avatar>
         </button>
-        <div className="flex-1">
+        <button
+          className="flex-1 text-left"
+          onClick={() => chatInfo?.is_group && setGroupSettingsOpen(true)}
+          disabled={!chatInfo?.is_group}
+        >
           <p className="font-semibold">{chatInfo?.name ?? "..."}</p>
-        </div>
+        </button>
         {!chatInfo?.is_group && chatInfo?.other_user_id && (
           <>
             <Button
@@ -553,6 +562,19 @@ export default function ChatScreen() {
           name={chatInfo.name ?? "Usuário"}
           avatarUrl={chatInfo.avatar_url}
           onClose={() => setAvatarViewerOpen(false)}
+        />
+      )}
+
+      {/* Group name/photo editor */}
+      {groupSettingsOpen && chatId && chatInfo?.is_group && (
+        <GroupSettingsDialog
+          chatId={chatId}
+          currentName={chatInfo.name ?? "Grupo"}
+          currentAvatarUrl={chatInfo.avatar_url}
+          onClose={() => setGroupSettingsOpen(false)}
+          onSaved={(name, avatarUrl) =>
+            setChatInfo((prev) => (prev ? { ...prev, name, avatar_url: avatarUrl ?? undefined } : prev))
+          }
         />
       )}
 
