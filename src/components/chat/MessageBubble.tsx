@@ -3,6 +3,7 @@ import { format } from "date-fns";
 import { FileText, Download, Reply, Trash2, Share2, Forward, X, Eye, EyeOff, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { resolveMediaUrl } from "@/lib/media";
+import ViewOnceViewer from "./ViewOnceViewer";
 
 interface ReplyInfo {
   id: string;
@@ -51,7 +52,8 @@ export default function MessageBubble({
   onViewOnceOpen,
 }: MessageBubbleProps) {
   const [showMenu, setShowMenu] = useState(false);
-  const [revealed, setRevealed] = useState(false);
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [locallyConsumed, setLocallyConsumed] = useState(false);
   const [resolvedMediaUrl, setResolvedMediaUrl] = useState<string | null>(null);
   const consumedRef = useRef(false);
 
@@ -60,8 +62,8 @@ export default function MessageBubble({
   // here on every view instead of expiring an hour after it was sent. Once a
   // view-once file has actually been opened, the message row's mediaUrl gets
   // updated to null (see markConsumed below) — ignore that so the
-  // already-resolved URL keeps working for the person who just revealed it,
-  // instead of the media vanishing out from under them the instant it's deleted.
+  // already-resolved URL keeps working for the viewer modal (still open at
+  // that point) instead of the media vanishing out from under it.
   useEffect(() => {
     if (!mediaUrl) return;
     let cancelled = false;
@@ -73,25 +75,25 @@ export default function MessageBubble({
     };
   }, [mediaUrl]);
 
-  // View-once message that has already been viewed by the recipient. The
-  // `!revealed` guard keeps showing the content to whoever just revealed it
-  // in this session (their view triggers the consumption in the first
-  // place) — everyone else, and this same viewer on a future reload, sees
-  // the "already viewed" placeholder instead.
-  const isViewOnceConsumed = viewOnce && viewedAt && !revealed;
-  // View-once message not yet opened by recipient (show blur for non-sender)
-  const isViewOnceHidden = viewOnce && !viewedAt && !isMine && !revealed;
+  // View-once message that has already been viewed. `locallyConsumed` is set
+  // synchronously by markConsumed below so the viewer sees the placeholder
+  // immediately after closing the modal, without waiting on the realtime
+  // round-trip for `viewedAt` to come back from the server.
+  const isViewOnceConsumed = viewOnce && (!!viewedAt || locallyConsumed);
+  // View-once media is never shown inline in the chat (for either side) —
+  // only inside the full-screen ViewOnceViewer modal, so it can't be
+  // screenshotted/forwarded/downloaded from the normal chat flow.
+  const showViewOnceGate = viewOnce && !isViewOnceConsumed;
 
   // Marks (and actually deletes, server-side) a view-once message as viewed
-  // — but only once the media has genuinely loaded/played/opened, not the
-  // instant the user taps "reveal". Deleting eagerly on tap was racing the
-  // browser's fetch of the file, so it sometimes got deleted before it ever
-  // rendered. isMine is excluded: the sender's own bubble renders the media
-  // directly (no reveal step), so without this guard sending the message
-  // would immediately consume/delete it before the recipient ever saw it.
+  // — but only once the media has genuinely loaded/played/opened inside the
+  // viewer modal, not the instant it's opened. isMine is excluded: the
+  // sender can still preview their own not-yet-viewed message without that
+  // triggering deletion.
   const markConsumed = () => {
     if (!viewOnce || viewedAt || isMine || consumedRef.current) return;
     consumedRef.current = true;
+    setLocallyConsumed(true);
     onViewOnceOpen?.(id);
   };
 
@@ -137,7 +139,7 @@ export default function MessageBubble({
   }
 
   const handleRevealViewOnce = () => {
-    setRevealed(true);
+    setViewerOpen(true);
   };
 
   const renderReplyPreview = () => {
@@ -180,7 +182,6 @@ export default function MessageBubble({
                 alt="Imagem"
                 className="max-w-full rounded-md mb-1 cursor-pointer"
                 onClick={() => window.open(resolvedMediaUrl, "_blank")}
-                onLoad={markConsumed}
               />
             )}
             {content && <p className="text-sm break-words">{content}</p>}
@@ -194,7 +195,6 @@ export default function MessageBubble({
                 src={resolvedMediaUrl}
                 controls
                 className="max-w-full rounded-md mb-1"
-                onLoadedData={markConsumed}
               />
             )}
             {content && <p className="text-sm break-words">{content}</p>}
@@ -204,7 +204,7 @@ export default function MessageBubble({
         return (
           <div className="min-w-[200px]">
             {resolvedMediaUrl && (
-              <audio controls className="w-full max-w-[250px]" preload="metadata" onPlay={markConsumed}>
+              <audio controls className="w-full max-w-[250px]" preload="metadata">
                 <source src={resolvedMediaUrl} type="audio/webm" />
               </audio>
             )}
@@ -217,7 +217,6 @@ export default function MessageBubble({
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-2 p-2 rounded-md bg-background/50 hover:bg-background/80 transition-colors"
-            onClick={markConsumed}
           >
             <FileText className="h-8 w-8 text-primary shrink-0" />
             <div className="flex-1 overflow-hidden">
@@ -248,10 +247,9 @@ export default function MessageBubble({
         }`}
         onContextMenu={(e) => {
           e.preventDefault();
-          if (!isViewOnceHidden) setShowMenu(true);
+          setShowMenu(true);
         }}
         onTouchStart={() => {
-          if (isViewOnceHidden) return;
           const timer = setTimeout(() => setShowMenu(true), 500);
           const clearTimer = () => clearTimeout(timer);
           document.addEventListener("touchend", clearTimer, { once: true });
@@ -260,34 +258,35 @@ export default function MessageBubble({
       >
         {renderReplyPreview()}
 
-        {isViewOnceHidden ? (
+        {showViewOnceGate ? (
           <button
             onClick={handleRevealViewOnce}
             className="flex flex-col items-center gap-1 py-3 px-6 w-full"
           >
             <Eye className="h-6 w-6 text-primary" />
             <span className="text-xs font-medium text-primary">Toque para visualizar</span>
-            {viewOnce && (
-              <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
-                <EyeOff className="h-3 w-3" /> Visualização única
-              </span>
-            )}
+            <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+              <EyeOff className="h-3 w-3" /> Visualização única
+            </span>
           </button>
         ) : (
-          <>
-            {renderContent()}
-            {viewOnce && !isViewOnceConsumed && (
-              <p className="text-[10px] mt-0.5 text-muted-foreground flex items-center gap-0.5">
-                <EyeOff className="h-3 w-3" /> Visualização única
-              </p>
-            )}
-          </>
+          renderContent()
         )}
 
         <p className="text-[10px] mt-1 text-right text-muted-foreground">
           {format(new Date(createdAt), "HH:mm")}
         </p>
       </div>
+
+      {viewerOpen && (
+        <ViewOnceViewer
+          mediaUrl={resolvedMediaUrl}
+          messageType={messageType}
+          content={content}
+          onLoaded={markConsumed}
+          onClose={() => setViewerOpen(false)}
+        />
+      )}
 
       {/* Context Menu */}
       {showMenu && (
@@ -302,18 +301,22 @@ export default function MessageBubble({
             >
               <Reply className="h-4 w-4" /> Responder
             </button>
-            <button
-              className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-muted transition-colors text-foreground"
-              onClick={() => handleAction(() => onForward(id))}
-            >
-              <Forward className="h-4 w-4" /> Encaminhar
-            </button>
-            <button
-              className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-muted transition-colors text-foreground"
-              onClick={() => handleAction(() => onShare(id))}
-            >
-              <Share2 className="h-4 w-4" /> Compartilhar
-            </button>
+            {!viewOnce && (
+              <>
+                <button
+                  className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-muted transition-colors text-foreground"
+                  onClick={() => handleAction(() => onForward(id))}
+                >
+                  <Forward className="h-4 w-4" /> Encaminhar
+                </button>
+                <button
+                  className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-muted transition-colors text-foreground"
+                  onClick={() => handleAction(() => onShare(id))}
+                >
+                  <Share2 className="h-4 w-4" /> Compartilhar
+                </button>
+              </>
+            )}
             <div className="border-t border-border my-1" />
             <button
               className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-muted transition-colors text-foreground"
