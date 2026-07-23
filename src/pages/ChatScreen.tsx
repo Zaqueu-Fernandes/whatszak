@@ -17,6 +17,7 @@ import ActiveCallOverlay from "@/components/call/ActiveCallOverlay";
 import ForwardMessageDialog from "@/components/chat/ForwardMessageDialog";
 import AvatarViewer from "@/components/AvatarViewer";
 import GroupSettingsDialog from "@/components/chat/GroupSettingsDialog";
+import GroupAvatarBadge from "@/components/GroupAvatarBadge";
 import { useWebRTC } from "@/hooks/use-webrtc";
 import type { CallMode } from "@/hooks/use-webrtc";
 import { toast } from "@/hooks/use-toast";
@@ -493,7 +494,7 @@ export default function ChatScreen() {
             if (chatInfo?.is_group) setGroupSettingsOpen(true);
             else if (chatInfo?.avatar_url) setAvatarViewerOpen(true);
           }}
-          className="shrink-0"
+          className="relative shrink-0"
           disabled={!chatInfo?.is_group && !chatInfo?.avatar_url}
         >
           <Avatar className="h-10 w-10">
@@ -502,6 +503,7 @@ export default function ChatScreen() {
               {initials}
             </AvatarFallback>
           </Avatar>
+          {chatInfo?.is_group && <GroupAvatarBadge />}
         </button>
         <button
           className="flex-1 text-left"

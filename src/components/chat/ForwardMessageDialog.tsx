@@ -5,6 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { X, Search } from "lucide-react";
+import GroupAvatarBadge from "@/components/GroupAvatarBadge";
 import { toast } from "@/hooks/use-toast";
 
 interface ForwardMessageDialogProps {
@@ -20,6 +21,7 @@ interface ChatOption {
   id: string;
   name: string;
   avatar_url?: string;
+  is_group?: boolean;
 }
 
 export default function ForwardMessageDialog({ message, onClose }: ForwardMessageDialogProps) {
@@ -54,7 +56,7 @@ export default function ForwardMessageDialog({ message, onClose }: ForwardMessag
 
     for (const chat of chatList) {
       if (chat.is_group) {
-        options.push({ id: chat.id, name: chat.name ?? "Grupo", avatar_url: chat.avatar_url ?? undefined });
+        options.push({ id: chat.id, name: chat.name ?? "Grupo", avatar_url: chat.avatar_url ?? undefined, is_group: true });
       } else {
         const { data: otherParticipants } = await supabase
           .from("chat_participants")
@@ -141,12 +143,15 @@ export default function ForwardMessageDialog({ message, onClose }: ForwardMessag
                 disabled={forwarding}
                 className="flex items-center gap-3 w-full p-3 rounded-lg hover:bg-muted transition-colors text-left"
               >
-                <Avatar className="h-10 w-10">
-                  <AvatarImage src={chat.avatar_url} />
-                  <AvatarFallback className="bg-primary/20 text-primary text-sm">
-                    {initials}
-                  </AvatarFallback>
-                </Avatar>
+                <div className="relative shrink-0">
+                  <Avatar className="h-10 w-10">
+                    <AvatarImage src={chat.avatar_url} />
+                    <AvatarFallback className="bg-primary/20 text-primary text-sm">
+                      {initials}
+                    </AvatarFallback>
+                  </Avatar>
+                  {chat.is_group && <GroupAvatarBadge />}
+                </div>
                 <span className="font-medium text-foreground">{chat.name}</span>
               </button>
             );

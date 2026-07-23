@@ -11,6 +11,7 @@ import { ptBR } from "date-fns/locale";
 import { useNotificationSound, useBrowserNotifications } from "@/hooks/use-notifications";
 import { toast } from "sonner";
 import PullToRefresh from "@/components/PullToRefresh";
+import GroupAvatarBadge from "@/components/GroupAvatarBadge";
 
 interface ChatItem {
   id: string;
@@ -219,10 +220,13 @@ export default function ChatList() {
                 className="flex w-full items-center gap-3 border-b border-border px-4 py-3 text-left transition-colors hover:bg-accent"
                 onClick={() => navigate(`/chat/${chat.id}`)}
               >
-                <Avatar className="h-12 w-12">
-                  <AvatarImage src={chat.avatar_url} />
-                  <AvatarFallback className="bg-primary/20 text-primary">{initials}</AvatarFallback>
-                </Avatar>
+                <div className="relative shrink-0">
+                  <Avatar className="h-12 w-12">
+                    <AvatarImage src={chat.avatar_url} />
+                    <AvatarFallback className="bg-primary/20 text-primary">{initials}</AvatarFallback>
+                  </Avatar>
+                  {chat.is_group && <GroupAvatarBadge />}
+                </div>
                 <div className="flex-1 overflow-hidden">
                   <div className="flex items-center justify-between">
                     <p className="font-semibold truncate">{chat.other_user_name ?? chat.name ?? "Chat"}</p>
