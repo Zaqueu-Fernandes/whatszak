@@ -49,6 +49,7 @@ export function useWebRTC({ userId, onRemoteStream, onCallEnded }: UseWebRTCOpti
   // has already reset call state) can still tell send-push which chat this
   // call belongs to, letting it verify the caller/callee actually share it.
   const chatIdRef = useRef<string | null>(null);
+  const facingModeRef = useRef<"user" | "environment">("user");
   // ICE candidates that arrive over Realtime before the remote description
   // has been applied yet (addIceCandidate throws in that state) are queued
   // here and flushed right after setRemoteDescription resolves.
@@ -84,6 +85,7 @@ export function useWebRTC({ userId, onRemoteStream, onCallEnded }: UseWebRTCOpti
   };
 
   const getLocalStream = async (mode: CallMode) => {
+    facingModeRef.current = "user";
     const constraints: MediaStreamConstraints = {
       audio: true,
       video: mode === "video" ? { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } } : false,
@@ -91,6 +93,42 @@ export function useWebRTC({ userId, onRemoteStream, onCallEnded }: UseWebRTCOpti
     const stream = await navigator.mediaDevices.getUserMedia(constraints);
     localStreamRef.current = stream;
     return stream;
+  };
+
+  // Swaps the outgoing video track for one from the other-facing camera,
+  // live, without renegotiating the call — replaceTrack() on the existing
+  // RTCRtpSender is enough since the peer connection doesn't care where a
+  // track's frames come from, only that the sender keeps producing them.
+  const flipCamera = async () => {
+    const pc = pcRef.current;
+    const stream = localStreamRef.current;
+    if (!pc || !stream || callMode !== "video") return;
+
+    const nextFacingMode = facingModeRef.current === "user" ? "environment" : "user";
+    try {
+      const newStream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: { facingMode: nextFacingMode, width: { ideal: 640 }, height: { ideal: 480 } },
+      });
+      const newTrack = newStream.getVideoTracks()[0];
+      if (!newTrack) return;
+
+      const sender = pc.getSenders().find((s) => s.track?.kind === "video");
+      if (sender) await sender.replaceTrack(newTrack);
+
+      const oldTrack = stream.getVideoTracks()[0];
+      if (oldTrack) {
+        stream.removeTrack(oldTrack);
+        oldTrack.stop();
+      }
+      stream.addTrack(newTrack);
+
+      facingModeRef.current = nextFacingMode;
+    } catch (e) {
+      // Device only has one camera, or permission hiccup — leave the
+      // current camera active rather than breaking the call over it.
+      console.warn("[WebRTC] flipCamera failed:", e);
+    }
   };
 
   const createPeerConnection = (currentCallId: string) => {
@@ -342,6 +380,7 @@ export function useWebRTC({ userId, onRemoteStream, onCallEnded }: UseWebRTCOpti
     answerCall,
     endCall,
     rejectCall,
+    flipCamera,
     localStream: localStreamRef.current,
     getLocalStream: () => localStreamRef.current,
     cleanup,

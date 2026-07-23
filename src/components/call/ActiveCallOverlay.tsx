@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { PhoneOff, Mic, MicOff, Video, VideoOff } from "lucide-react";
+import { PhoneOff, Mic, MicOff, Video, VideoOff, SwitchCamera } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import type { CallMode } from "@/hooks/use-webrtc";
@@ -13,6 +13,7 @@ interface ActiveCallOverlayProps {
   localStream: MediaStream | null;
   remoteStream: MediaStream | null;
   onHangUp: () => void;
+  onFlipCamera?: () => void;
 }
 
 export default function ActiveCallOverlay({
@@ -23,6 +24,7 @@ export default function ActiveCallOverlay({
   localStream,
   remoteStream,
   onHangUp,
+  onFlipCamera,
 }: ActiveCallOverlayProps) {
   const [muted, setMuted] = useState(false);
   const [cameraOff, setCameraOff] = useState(false);
@@ -151,6 +153,17 @@ export default function ActiveCallOverlay({
             onClick={toggleCamera}
           >
             {cameraOff ? <VideoOff className="h-6 w-6" /> : <Video className="h-6 w-6" />}
+          </Button>
+        )}
+
+        {isVideo && onFlipCamera && !cameraOff && (
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-14 w-14 rounded-full bg-primary-foreground/10 text-primary-foreground"
+            onClick={onFlipCamera}
+          >
+            <SwitchCamera className="h-6 w-6" />
           </Button>
         )}
 

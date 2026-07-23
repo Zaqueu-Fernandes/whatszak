@@ -76,6 +76,7 @@ export default function ChatScreen() {
     callMode,
     startCall,
     endCall,
+    flipCamera,
     getLocalStream,
   } = useWebRTC({
     userId: user?.id ?? "",
@@ -526,6 +527,7 @@ export default function ChatScreen() {
           localStream={getLocalStream()}
           remoteStream={remoteStream}
           onHangUp={() => endCall()}
+          onFlipCamera={flipCamera}
         />
       )}
 
