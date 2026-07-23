@@ -93,23 +93,6 @@ export default function ChatScreen() {
     getUserLimitProfile(user.id).then(({ autoDeleteOnView }) => setAutoDeleteOnView(autoDeleteOnView));
   }, [user]);
 
-  // Belt-and-suspenders for the header/footer pin: on some WebView
-  // engines, `body`'s safe-area-inset padding (src/index.css) can push its
-  // total height a few pixels past 100vh/100dvh even with the screen root's
-  // own overflow-hidden, letting the page itself scroll by that sliver —
-  // enough for a fixed status bar area to visibly drift on some devices but
-  // not others. Locking body scroll while this screen is mounted removes
-  // that possibility outright; other screens (ChatList, Profile, ...) still
-  // rely on normal page scroll, so this only applies here and is reverted
-  // on unmount.
-  useEffect(() => {
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
-  }, []);
-
   useEffect(() => {
     if (!chatId || !user) return;
     loadChatInfo();
@@ -494,7 +477,7 @@ export default function ChatScreen() {
   const visibleMessages = messages.filter((m) => !deletedForMe.has(m.id));
 
   return (
-    <div className="flex h-screen h-dvh flex-col overflow-hidden bg-chat-bg">
+    <div className="fixed inset-0 flex flex-col overflow-hidden bg-chat-bg pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
       {/* Header */}
       <header className="shrink-0 flex items-center gap-3 bg-primary px-3 py-2 text-primary-foreground">
         <Button variant="ghost" size="icon" onClick={() => navigate("/")} className="text-primary-foreground hover:bg-primary/80">
