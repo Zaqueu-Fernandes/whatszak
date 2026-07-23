@@ -82,8 +82,11 @@ export default function MessageBubble({
   const isViewOnceConsumed = viewOnce && (!!viewedAt || locallyConsumed);
   // View-once media is never shown inline in the chat (for either side) —
   // only inside the full-screen ViewOnceViewer modal, so it can't be
-  // screenshotted/forwarded/downloaded from the normal chat flow.
-  const showViewOnceGate = viewOnce && !isViewOnceConsumed;
+  // screenshotted/forwarded/downloaded from the normal chat flow. Stays true
+  // while the modal is still open even after consumption fires mid-viewing,
+  // so the bubble behind the modal doesn't flip to rendering the raw media
+  // inline (see the isViewOnceConsumed early-return's `!viewerOpen` guard).
+  const showViewOnceGate = viewOnce && (!isViewOnceConsumed || viewerOpen);
 
   // Marks (and actually deletes, server-side) a view-once message as viewed
   // — but only once the media has genuinely loaded/played/opened inside the
@@ -97,8 +100,14 @@ export default function MessageBubble({
     onViewOnceOpen?.(id);
   };
 
-  // View-once consumed: show placeholder
-  if (isViewOnceConsumed) {
+  // View-once consumed: show placeholder. Guarded by `!viewerOpen` — marking
+  // consumed happens as soon as the media loads/plays *inside* the modal
+  // (see markConsumed), which is well before the user is actually done
+  // looking at/listening to it. Without this guard the component would
+  // switch to this early-return branch immediately and unmount the modal
+  // out from under them, closing it 1-2s into playback instead of when they
+  // actually dismiss it.
+  if (isViewOnceConsumed && !viewerOpen) {
     return (
       <div className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
         <div
