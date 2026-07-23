@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft, Trash2, Shield, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import LimitProfilesCard from "@/components/admin/LimitProfilesCard";
+import BulkCreateUsersCard from "@/components/admin/BulkCreateUsersCard";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -147,6 +148,7 @@ export default function AdminUsers() {
 
       <div className="flex-1 p-4 space-y-3">
         <LimitProfilesCard />
+        <BulkCreateUsersCard />
 
         <div className="flex items-center gap-2 text-muted-foreground mb-2 pt-2">
           <Users className="h-4 w-4" />
