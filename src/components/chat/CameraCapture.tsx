@@ -1,6 +1,12 @@
 import { useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Camera } from "lucide-react";
+import { Camera, Image, Video } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface CameraCaptureProps {
   onCaptured: (file: File, type: "image" | "video") => void;
@@ -8,34 +14,61 @@ interface CameraCaptureProps {
 }
 
 export default function CameraCapture({ onCaptured, disabled }: CameraCaptureProps) {
-  const inputRef = useRef<HTMLInputElement>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
 
   return (
     <>
-      {/* accept covers both so the native camera app itself offers the
-          photo/video mode switch, same as WhatsApp's single camera button;
-          capture="environment" skips the gallery and opens the camera directly. */}
+      {/* Two single-purpose inputs, not one with accept="image/*,video/*" —
+          Android's WebView only reliably jumps straight into the native
+          camera (skipping the gallery/file-chooser fallback) when the accept
+          type is unambiguous. */}
       <input
-        ref={inputRef}
+        ref={photoInputRef}
         type="file"
-        accept="image/*,video/*"
+        accept="image/*"
         capture="environment"
         className="hidden"
         onChange={(e) => {
           const file = e.target.files?.[0];
-          if (file) onCaptured(file, file.type.startsWith("video/") ? "video" : "image");
+          if (file) onCaptured(file, "image");
           e.target.value = "";
         }}
       />
-      <Button
-        size="icon"
-        variant="ghost"
-        className="rounded-full h-10 w-10 text-muted-foreground"
-        onClick={() => inputRef.current?.click()}
-        disabled={disabled}
-      >
-        <Camera className="h-5 w-5" />
-      </Button>
+      <input
+        ref={videoInputRef}
+        type="file"
+        accept="video/*"
+        capture="environment"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) onCaptured(file, "video");
+          e.target.value = "";
+        }}
+      />
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="rounded-full h-10 w-10 text-muted-foreground"
+            disabled={disabled}
+          >
+            <Camera className="h-5 w-5" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent side="top" align="start" className="min-w-[160px]">
+          <DropdownMenuItem onClick={() => photoInputRef.current?.click()}>
+            <Image className="mr-2 h-4 w-4 text-primary" />
+            Foto
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => videoInputRef.current?.click()}>
+            <Video className="mr-2 h-4 w-4 text-primary" />
+            Vídeo
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </>
   );
 }
