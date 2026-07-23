@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { format } from "date-fns";
 import { FileText, Download, Reply, Trash2, Share2, Forward, X, Eye, EyeOff, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -53,11 +53,17 @@ export default function MessageBubble({
   const [showMenu, setShowMenu] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const [resolvedMediaUrl, setResolvedMediaUrl] = useState<string | null>(null);
+  const consumedRef = useRef(false);
 
   // mediaUrl stores the raw Storage path (or, for older messages, an already
   // pre-signed URL) rather than a ready-to-use link, so it can be re-signed
-  // here on every view instead of expiring an hour after it was sent.
+  // here on every view instead of expiring an hour after it was sent. Once a
+  // view-once file has actually been opened, the message row's mediaUrl gets
+  // updated to null (see markConsumed below) — ignore that so the
+  // already-resolved URL keeps working for the person who just revealed it,
+  // instead of the media vanishing out from under them the instant it's deleted.
   useEffect(() => {
+    if (!mediaUrl) return;
     let cancelled = false;
     resolveMediaUrl(mediaUrl).then((url) => {
       if (!cancelled) setResolvedMediaUrl(url);
@@ -67,10 +73,27 @@ export default function MessageBubble({
     };
   }, [mediaUrl]);
 
-  // View-once message that has already been viewed by the recipient
-  const isViewOnceConsumed = viewOnce && viewedAt;
+  // View-once message that has already been viewed by the recipient. The
+  // `!revealed` guard keeps showing the content to whoever just revealed it
+  // in this session (their view triggers the consumption in the first
+  // place) — everyone else, and this same viewer on a future reload, sees
+  // the "already viewed" placeholder instead.
+  const isViewOnceConsumed = viewOnce && viewedAt && !revealed;
   // View-once message not yet opened by recipient (show blur for non-sender)
   const isViewOnceHidden = viewOnce && !viewedAt && !isMine && !revealed;
+
+  // Marks (and actually deletes, server-side) a view-once message as viewed
+  // — but only once the media has genuinely loaded/played/opened, not the
+  // instant the user taps "reveal". Deleting eagerly on tap was racing the
+  // browser's fetch of the file, so it sometimes got deleted before it ever
+  // rendered. isMine is excluded: the sender's own bubble renders the media
+  // directly (no reveal step), so without this guard sending the message
+  // would immediately consume/delete it before the recipient ever saw it.
+  const markConsumed = () => {
+    if (!viewOnce || viewedAt || isMine || consumedRef.current) return;
+    consumedRef.current = true;
+    onViewOnceOpen?.(id);
+  };
 
   // View-once consumed: show placeholder
   if (isViewOnceConsumed) {
@@ -115,7 +138,6 @@ export default function MessageBubble({
 
   const handleRevealViewOnce = () => {
     setRevealed(true);
-    onViewOnceOpen?.(id);
   };
 
   const renderReplyPreview = () => {
@@ -158,6 +180,7 @@ export default function MessageBubble({
                 alt="Imagem"
                 className="max-w-full rounded-md mb-1 cursor-pointer"
                 onClick={() => window.open(resolvedMediaUrl, "_blank")}
+                onLoad={markConsumed}
               />
             )}
             {content && <p className="text-sm break-words">{content}</p>}
@@ -171,6 +194,7 @@ export default function MessageBubble({
                 src={resolvedMediaUrl}
                 controls
                 className="max-w-full rounded-md mb-1"
+                onLoadedData={markConsumed}
               />
             )}
             {content && <p className="text-sm break-words">{content}</p>}
@@ -180,7 +204,7 @@ export default function MessageBubble({
         return (
           <div className="min-w-[200px]">
             {resolvedMediaUrl && (
-              <audio controls className="w-full max-w-[250px]" preload="metadata">
+              <audio controls className="w-full max-w-[250px]" preload="metadata" onPlay={markConsumed}>
                 <source src={resolvedMediaUrl} type="audio/webm" />
               </audio>
             )}
@@ -193,6 +217,7 @@ export default function MessageBubble({
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-2 p-2 rounded-md bg-background/50 hover:bg-background/80 transition-colors"
+            onClick={markConsumed}
           >
             <FileText className="h-8 w-8 text-primary shrink-0" />
             <div className="flex-1 overflow-hidden">

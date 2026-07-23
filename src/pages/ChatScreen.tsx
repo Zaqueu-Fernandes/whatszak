@@ -51,6 +51,11 @@ export default function ChatScreen() {
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [forwardingMsg, setForwardingMsg] = useState<Message | null>(null);
   const [viewOnce, setViewOnce] = useState(false);
+  // "Privacidade" limit profile already forces every media message to
+  // view-once server-side (see handleFileSelected/handleAudioRecorded) —
+  // showing the manual toggle on top of that is redundant and confusing,
+  // since it looks off but every send behaves as if it were on.
+  const [autoDeleteOnView, setAutoDeleteOnView] = useState(false);
   const [senderNames, setSenderNames] = useState<Record<string, string>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
@@ -82,6 +87,11 @@ export default function ChatScreen() {
     if (!chatId || !chatInfo?.other_user_id || chatInfo.is_group) return;
     startCall(chatId, chatInfo.other_user_id, mode);
   };
+
+  useEffect(() => {
+    if (!user) return;
+    getUserLimitProfile(user.id).then(({ autoDeleteOnView }) => setAutoDeleteOnView(autoDeleteOnView));
+  }, [user]);
 
   useEffect(() => {
     if (!chatId || !user) return;
@@ -361,14 +371,14 @@ export default function ChatScreen() {
   };
 
   const handleViewOnceOpen = async (msgId: string) => {
+    // Called by MessageBubble only after the media has actually
+    // loaded/played/opened (not on the initial "tap to view"), so the file
+    // can't be deleted out from under a viewer who hasn't seen it yet.
     // Marks viewed_at AND actually deletes the file from Storage (the viewer
     // isn't the file's owner, so this has to run with elevated privileges —
-    // see the delete-viewed-media Edge Function).
-    setMessages((prev) =>
-      prev.map((m) =>
-        m.id === msgId ? { ...m, viewed_at: new Date().toISOString(), media_url: null } : m
-      )
-    );
+    // see the delete-viewed-media Edge Function). The messages array picks
+    // up the resulting viewed_at/media_url change via the realtime UPDATE
+    // subscription above, not an optimistic local update here.
     const { error } = await supabase.functions.invoke("delete-viewed-media", {
       body: { message_id: msgId },
     });
@@ -554,7 +564,7 @@ export default function ChatScreen() {
       )}
 
       {/* View once indicator */}
-      {viewOnce && (
+      {viewOnce && !autoDeleteOnView && (
         <div className="flex items-center gap-2 bg-primary/10 px-3 py-1.5 border-t border-border">
           <EyeOff className="h-3.5 w-3.5 text-primary" />
           <span className="text-xs text-primary font-medium flex-1">Visualização única ativada</span>
@@ -563,20 +573,21 @@ export default function ChatScreen() {
           </Button>
         </div>
       )}
-
       {/* Input */}
       <div className="flex items-center gap-1 border-t border-border bg-card px-2 py-2">
         <AttachmentPicker onFileSelected={handleFileSelected} disabled={sending} />
         <CameraCapture onCaptured={handleFileSelected} disabled={sending} />
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setViewOnce(!viewOnce)}
-          className={`h-9 w-9 shrink-0 ${viewOnce ? "text-primary bg-primary/10" : "text-muted-foreground"}`}
-          title="Visualização única"
-        >
-          {viewOnce ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-        </Button>
+        {!autoDeleteOnView && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setViewOnce(!viewOnce)}
+            className={`h-9 w-9 shrink-0 ${viewOnce ? "text-primary bg-primary/10" : "text-muted-foreground"}`}
+            title="Visualização única"
+          >
+            {viewOnce ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </Button>
+        )}
         <Input
           value={newMessage}
           onChange={(e) => setNewMessage(e.target.value)}
