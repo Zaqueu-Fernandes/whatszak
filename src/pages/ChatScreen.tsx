@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ArrowLeft, Send, Phone, Video, X, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, Send, Phone, Video, X, Eye, EyeOff, Lock } from "lucide-react";
 import { useNotificationSound, useBrowserNotifications } from "@/hooks/use-notifications";
 import { sendPushToUser } from "@/lib/push";
 import { resolveMediaUrl, getUserLimitProfile } from "@/lib/media";
@@ -41,6 +41,7 @@ interface ChatInfo {
   avatar_url?: string;
   is_group: boolean;
   other_user_id?: string;
+  only_admins_can_message?: boolean;
 }
 
 export default function ChatScreen() {
@@ -55,6 +56,7 @@ export default function ChatScreen() {
   const [forwardingMsg, setForwardingMsg] = useState<Message | null>(null);
   const [avatarViewerOpen, setAvatarViewerOpen] = useState(false);
   const [groupSettingsOpen, setGroupSettingsOpen] = useState(false);
+  const [isGroupAdmin, setIsGroupAdmin] = useState(false);
   const [viewOnce, setViewOnce] = useState(false);
   // "Privacidade" limit profile already forces every media message to
   // view-once server-side (see handleFileSelected/handleAudioRecorded) —
@@ -165,14 +167,26 @@ export default function ChatScreen() {
 
     const { data: chat } = await supabase
       .from("chats")
-      .select("name, is_group, avatar_url")
+      .select("name, is_group, avatar_url, only_admins_can_message")
       .eq("id", chatId)
       .single();
 
     if (!chat) return;
 
     if (chat.is_group) {
-      setChatInfo({ name: chat.name ?? "Grupo", avatar_url: chat.avatar_url ?? undefined, is_group: true });
+      setChatInfo({
+        name: chat.name ?? "Grupo",
+        avatar_url: chat.avatar_url ?? undefined,
+        is_group: true,
+        only_admins_can_message: chat.only_admins_can_message ?? false,
+      });
+      const { data: membership } = await supabase
+        .from("chat_participants")
+        .select("is_admin")
+        .eq("chat_id", chatId)
+        .eq("user_id", user.id)
+        .single();
+      setIsGroupAdmin(!!membership?.is_admin);
     } else {
       const { data: participants } = await supabase
         .from("chat_participants")
@@ -481,6 +495,7 @@ export default function ChatScreen() {
     .slice(0, 2) ?? "?";
 
   const visibleMessages = messages.filter((m) => !deletedForMe.has(m.id));
+  const messagingLocked = !!chatInfo?.is_group && !!chatInfo?.only_admins_can_message && !isGroupAdmin;
 
   return (
     <div className="fixed inset-0 flex flex-col overflow-hidden bg-chat-bg pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
@@ -567,15 +582,20 @@ export default function ChatScreen() {
         />
       )}
 
-      {/* Group name/photo editor */}
-      {groupSettingsOpen && chatId && chatInfo?.is_group && (
+      {/* Group info: member list for everyone, edit controls for admins only */}
+      {groupSettingsOpen && chatId && chatInfo?.is_group && user && (
         <GroupSettingsDialog
           chatId={chatId}
+          currentUserId={user.id}
           currentName={chatInfo.name ?? "Grupo"}
           currentAvatarUrl={chatInfo.avatar_url}
+          onlyAdminsCanMessage={!!chatInfo.only_admins_can_message}
+          isAdmin={isGroupAdmin}
           onClose={() => setGroupSettingsOpen(false)}
-          onSaved={(name, avatarUrl) =>
-            setChatInfo((prev) => (prev ? { ...prev, name, avatar_url: avatarUrl ?? undefined } : prev))
+          onSaved={(name, avatarUrl, onlyAdminsCanMessage) =>
+            setChatInfo((prev) =>
+              prev ? { ...prev, name, avatar_url: avatarUrl ?? undefined, only_admins_can_message: onlyAdminsCanMessage } : prev
+            )
           }
         />
       )}
@@ -639,40 +659,47 @@ export default function ChatScreen() {
         </div>
       )}
       {/* Input */}
-      <div className="shrink-0 flex items-center gap-1 border-t border-border bg-card px-2 py-2">
-        <AttachmentPicker onFileSelected={handleFileSelected} disabled={sending} />
-        <CameraCapture onCaptured={handleFileSelected} disabled={sending} />
-        {!autoDeleteOnView && (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setViewOnce(!viewOnce)}
-            className={`h-9 w-9 shrink-0 ${viewOnce ? "text-primary bg-primary/10" : "text-muted-foreground"}`}
-            title="Visualização única"
-          >
-            {viewOnce ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-          </Button>
-        )}
-        <Input
-          value={newMessage}
-          onChange={(e) => setNewMessage(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Mensagem"
-          className="flex-1 rounded-full"
-        />
-        {newMessage.trim() ? (
-          <Button
-            size="icon"
-            onClick={handleSend}
-            disabled={!newMessage.trim() || sending}
-            className="rounded-full h-10 w-10"
-          >
-            <Send className="h-4 w-4" />
-          </Button>
-        ) : (
-          <AudioRecorder onRecorded={handleAudioRecorded} disabled={sending} />
-        )}
-      </div>
+      {messagingLocked ? (
+        <div className="shrink-0 flex items-center justify-center gap-2 border-t border-border bg-card px-4 py-3 text-sm text-muted-foreground">
+          <Lock className="h-4 w-4" />
+          Somente administradores podem enviar mensagens neste grupo
+        </div>
+      ) : (
+        <div className="shrink-0 flex items-center gap-1 border-t border-border bg-card px-2 py-2">
+          <AttachmentPicker onFileSelected={handleFileSelected} disabled={sending} />
+          <CameraCapture onCaptured={handleFileSelected} disabled={sending} />
+          {!autoDeleteOnView && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setViewOnce(!viewOnce)}
+              className={`h-9 w-9 shrink-0 ${viewOnce ? "text-primary bg-primary/10" : "text-muted-foreground"}`}
+              title="Visualização única"
+            >
+              {viewOnce ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </Button>
+          )}
+          <Input
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Mensagem"
+            className="flex-1 rounded-full"
+          />
+          {newMessage.trim() ? (
+            <Button
+              size="icon"
+              onClick={handleSend}
+              disabled={!newMessage.trim() || sending}
+              className="rounded-full h-10 w-10"
+            >
+              <Send className="h-4 w-4" />
+            </Button>
+          ) : (
+            <AudioRecorder onRecorded={handleAudioRecorded} disabled={sending} />
+          )}
+        </div>
+      )}
     </div>
   );
 }
