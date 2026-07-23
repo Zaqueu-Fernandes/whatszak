@@ -93,6 +93,23 @@ export default function ChatScreen() {
     getUserLimitProfile(user.id).then(({ autoDeleteOnView }) => setAutoDeleteOnView(autoDeleteOnView));
   }, [user]);
 
+  // Belt-and-suspenders for the header/footer pin: on some WebView
+  // engines, `body`'s safe-area-inset padding (src/index.css) can push its
+  // total height a few pixels past 100vh/100dvh even with the screen root's
+  // own overflow-hidden, letting the page itself scroll by that sliver —
+  // enough for a fixed status bar area to visibly drift on some devices but
+  // not others. Locking body scroll while this screen is mounted removes
+  // that possibility outright; other screens (ChatList, Profile, ...) still
+  // rely on normal page scroll, so this only applies here and is reverted
+  // on unmount.
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, []);
+
   useEffect(() => {
     if (!chatId || !user) return;
     loadChatInfo();
@@ -538,7 +555,7 @@ export default function ChatScreen() {
       )}
 
       {/* Messages */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-3 py-4 space-y-2">
+      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 py-4 space-y-2">
         {visibleMessages.map((msg) => (
           <MessageBubble
             key={msg.id}
